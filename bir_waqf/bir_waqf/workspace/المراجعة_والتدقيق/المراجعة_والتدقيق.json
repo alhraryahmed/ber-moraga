@@ -1,0 +1,69 @@
+{
+ "charts": [],
+ "content": "[{\"id\":\"7lJ77y8IgS\",\"type\":\"custom_block\",\"data\":{\"custom_block_name\":\"Bir Waqf Dashboard Block\",\"col\":12}},{\"id\":\"cN2tRniFAI\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\">\u0627\u0644\u0645\u0631\u0627\u062c\u0639\u0629 \u0627\u0644\u062f\u0627\u062e\u0644\u064a\u0629 \u0648\u0627\u0644\u062a\u062f\u0642\u064a\u0642 (\u0645\u0646\u0635\u0629 \u0627\u0644\u0628\u0631 \u0627\u0644\u0648\u0642\u0641\u064a\u0629)</span>\",\"col\":12}},{\"id\":\"M-P3yvVjVl\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"\u0645\u0631\u0643\u0632 \u0645\u0639\u0627\u0644\u062c\u0629 \u0627\u0644\u0628\u064a\u0627\u0646\u0627\u062a\",\"col\":3}},{\"id\":\"iLcCkKIYu_\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"\u062f\u0641\u0639\u0627\u062a \u0627\u0644\u0627\u0633\u062a\u064a\u0631\u0627\u062f\",\"col\":3}},{\"id\":\"vbYA1YCxeI\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"\u062c\u0645\u064a\u0639 \u0627\u0644\u0645\u0639\u0627\u0645\u0644\u0627\u062a\",\"col\":3}},{\"id\":\"EMg7oCjIAT\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"\u0645\u0639\u0627\u0645\u0644\u0627\u062a \u0627\u0644\u0633\u0644\u0629\",\"col\":3}},{\"id\":\"7NRUBa1L2y\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"\u0643\u0634\u0648\u0641 \u0627\u0644\u062d\u0633\u0627\u0628 \u0627\u0644\u0645\u0635\u0631\u0641\u064a\u0629\",\"col\":3}}]",
+ "creation": "2026-07-23 00:00:00",
+ "custom_blocks": [
+  {
+   "custom_block_name": "Bir Waqf Dashboard Block",
+   "label": "Bir Waqf Dashboard Block"
+  }
+ ],
+ "docstatus": 0,
+ "doctype": "Workspace",
+ "for_user": "",
+ "hide_custom": 0,
+ "icon": "bank",
+ "idx": 0,
+ "is_hidden": 0,
+ "label": "\u0627\u0644\u0645\u0631\u0627\u062c\u0639\u0629 \u0648\u0627\u0644\u062a\u062f\u0642\u064a\u0642",
+ "links": [],
+ "modified": "2026-07-23 03:00:48.783203",
+ "modified_by": "Administrator",
+ "module": "Bir Waqf",
+ "name": "\u0627\u0644\u0645\u0631\u0627\u062c\u0639\u0629 \u0648\u0627\u0644\u062a\u062f\u0642\u064a\u0642",
+ "number_cards": [],
+ "owner": "Administrator",
+ "public": 1,
+ "quick_lists": [],
+ "roles": [],
+ "sequence_id": 1.0,
+ "shortcuts": [
+  {
+   "color": "Green",
+   "doc_view": "",
+   "label": "\u0645\u0631\u0643\u0632 \u0645\u0639\u0627\u0644\u062c\u0629 \u0627\u0644\u0628\u064a\u0627\u0646\u0627\u062a",
+   "link_to": "bir_data_processor",
+   "type": "Page"
+  },
+  {
+   "color": "Purple",
+   "doc_view": "",
+   "label": "\u062f\u0641\u0639\u0627\u062a \u0627\u0644\u0627\u0633\u062a\u064a\u0631\u0627\u062f",
+   "link_to": "Bir Import Batch",
+   "type": "DocType"
+  },
+  {
+   "color": "Blue",
+   "doc_view": "",
+   "label": "\u062c\u0645\u064a\u0639 \u0627\u0644\u0645\u0639\u0627\u0645\u0644\u0627\u062a",
+   "link_to": "Bir Transaction",
+   "type": "DocType"
+  },
+  {
+   "color": "Orange",
+   "doc_view": "",
+   "label": "\u0645\u0639\u0627\u0645\u0644\u0627\u062a \u0627\u0644\u0633\u0644\u0629",
+   "link_to": "Bir Transaction",
+   "stats_filter": "[[\"Bir Transaction\", \"is_basket\", \"=\", 1]]",
+   "type": "DocType"
+  },
+  {
+   "color": "Green",
+   "doc_view": "",
+   "label": "\u0643\u0634\u0648\u0641 \u0627\u0644\u062d\u0633\u0627\u0628 \u0627\u0644\u0645\u0635\u0631\u0641\u064a\u0629",
+   "link_to": "Bir Bank Statement",
+   "type": "DocType"
+  }
+ ],
+ "title": "\u0627\u0644\u0645\u0631\u0627\u062c\u0639\u0629 \u0648\u0627\u0644\u062a\u062f\u0642\u064a\u0642"
+}

@@ -1,0 +1,35 @@
+{
+  "actions": [],
+  "creation": "2026-07-23 00:00:00.000000",
+  "doctype": "DocType",
+  "editable_grid": 1,
+  "engine": "InnoDB",
+  "field_order": [
+    "project_name",
+    "sub_amount"
+  ],
+  "fields": [
+    {
+      "fieldname": "project_name",
+      "fieldtype": "Data",
+      "in_list_view": 1,
+      "label": "اسم المشروع",
+      "reqd": 1
+    },
+    {
+      "fieldname": "sub_amount",
+      "fieldtype": "Currency",
+      "in_list_view": 1,
+      "label": "المبلغ الفرعي",
+      "reqd": 1
+    }
+  ],
+  "istable": 1,
+  "module": "Bir Waqf",
+  "name": "Bir Basket Project",
+  "naming_rule": "Random",
+  "owner": "Administrator",
+  "permissions": [],
+  "sort_field": "modified",
+  "sort_order": "DESC"
+}

@@ -1,0 +1,83 @@
+{
+  "actions": [],
+  "allow_rename": 1,
+  "autoname": "format:BATCH-{YYYY}-{#####}",
+  "creation": "2026-07-23 00:00:00.000000",
+  "doctype": "DocType",
+  "engine": "InnoDB",
+  "field_order": [
+    "file_name",
+    "import_date",
+    "cb1",
+    "total_transactions",
+    "basket_transactions",
+    "total_donations",
+    "exceptions_count"
+  ],
+  "fields": [
+    {
+      "fieldname": "file_name",
+      "fieldtype": "Data",
+      "in_list_view": 1,
+      "label": "اسم الملف المرفوع",
+      "reqd": 1
+    },
+    {
+      "fieldname": "import_date",
+      "fieldtype": "Datetime",
+      "in_list_view": 1,
+      "label": "تاريخ الاستجلاب",
+      "reqd": 1
+    },
+    {
+      "fieldname": "cb1",
+      "fieldtype": "Column Break"
+    },
+    {
+      "fieldname": "total_transactions",
+      "fieldtype": "Int",
+      "in_list_view": 1,
+      "label": "إجمالي المعاملات"
+    },
+    {
+      "fieldname": "basket_transactions",
+      "fieldtype": "Int",
+      "in_list_view": 1,
+      "label": "معاملات السلة"
+    },
+    {
+      "fieldname": "total_donations",
+      "fieldtype": "Currency",
+      "in_list_view": 1,
+      "label": "إجمالي التبرعات"
+    },
+    {
+      "fieldname": "exceptions_count",
+      "fieldtype": "Int",
+      "in_list_view": 1,
+      "label": "عدد الاستثناءات"
+    }
+  ],
+  "module": "Bir Waqf",
+  "name": "Bir Import Batch",
+  "naming_rule": "Expression",
+  "owner": "Administrator",
+  "permissions": [
+    {
+      "create": 1,
+      "delete": 1,
+      "email": 1,
+      "export": 1,
+      "print": 1,
+      "read": 1,
+      "report": 1,
+      "role": "System Manager",
+      "share": 1,
+      "write": 1
+    }
+  ],
+  "search_fields": "file_name, import_date",
+  "sort_field": "modified",
+  "sort_order": "DESC",
+  "title_field": "file_name"
+}

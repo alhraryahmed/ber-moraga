@@ -1,0 +1,91 @@
+{
+  "actions": [],
+  "allow_rename": 1,
+  "autoname": "field:statement_name",
+  "creation": "2026-07-23 00:00:00.000000",
+  "doctype": "DocType",
+  "engine": "InnoDB",
+  "field_order": [
+    "statement_name",
+    "bank",
+    "bank_account",
+    "cb1",
+    "from_date",
+    "to_date",
+    "section_entries",
+    "entries"
+  ],
+  "fields": [
+    {
+      "fieldname": "statement_name",
+      "fieldtype": "Data",
+      "in_list_view": 1,
+      "label": "عنوان كشف الحساب",
+      "reqd": 1,
+      "unique": 1
+    },
+    {
+      "fieldname": "bank",
+      "fieldtype": "Link",
+      "in_list_view": 1,
+      "label": "المصرف",
+      "options": "Bank"
+    },
+    {
+      "fieldname": "bank_account",
+      "fieldtype": "Link",
+      "in_list_view": 1,
+      "label": "الحساب المصرفي",
+      "options": "Bank Account"
+    },
+    {
+      "fieldname": "cb1",
+      "fieldtype": "Column Break"
+    },
+    {
+      "fieldname": "from_date",
+      "fieldtype": "Date",
+      "in_list_view": 1,
+      "label": "من تاريخ"
+    },
+    {
+      "fieldname": "to_date",
+      "fieldtype": "Date",
+      "in_list_view": 1,
+      "label": "إلى تاريخ"
+    },
+    {
+      "fieldname": "section_entries",
+      "fieldtype": "Section Break",
+      "label": "بنود كشف الحساب المصرفي"
+    },
+    {
+      "fieldname": "entries",
+      "fieldtype": "Table",
+      "label": "البنود",
+      "options": "Bir Bank Statement Entry"
+    }
+  ],
+  "module": "Bir Waqf",
+  "name": "Bir Bank Statement",
+  "naming_rule": "By fieldname",
+  "owner": "Administrator",
+  "permissions": [
+    {
+      "create": 1,
+      "delete": 1,
+      "email": 1,
+      "export": 1,
+      "print": 1,
+      "read": 1,
+      "report": 1,
+      "role": "System Manager",
+      "share": 1,
+      "write": 1
+    }
+  ],
+  "search_fields": "statement_name, bank, bank_account",
+  "sort_field": "modified",
+  "sort_order": "DESC",
+  "title_field": "statement_name"
+}
