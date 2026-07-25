@@ -9,6 +9,10 @@ app_include_css = "/assets/bir_waqf/css/bir_waqf.css"
 
 fixtures = [
 	"Custom HTML Block",
+	"Client Script",
+	"Server Script",
+	"Custom Field",
+	"Property Setter",
 	"Print Format",
 	"Workspace",
 	"Page"
