@@ -14,7 +14,6 @@ def parse_project_line(line):
 	if not text:
 		return None
 		
-	# Match amount inside parentheses at end of line (ignoring trailing quotes or spaces)
 	match = re.search(r'^(.*?)(?:\s*\(([-+]?[0-9]*\.?[0-9]+)\))?"?\s*$', text)
 	if match:
 		p_name = match.group(1).strip().strip('"').strip("'")
@@ -57,7 +56,7 @@ def clean_str(val):
 	if pd.isna(val):
 		return ""
 	s = str(val).strip()
-	if s.lower() == 'nan' or s == 'None':
+	if s.lower() == 'nan' or s == 'none' or s == '-':
 		return ""
 	return s
 
@@ -114,6 +113,8 @@ def process_bir_file(file_path, batch_id=None):
 		val_raw = row_dict.get('القيمة')
 		date_raw = row_dict.get('تاريخ المعاملة')
 		status_raw = row_dict.get('حالة المعاملة') or 'مكتمل'
+		if status_raw not in ['مكتمل', 'معلق', 'ملغى']:
+			status_raw = 'مكتمل'
 
 		has_valid_id = is_numeric_tx_id(tx_id_raw)
 
@@ -189,7 +190,7 @@ def process_bir_file(file_path, batch_id=None):
 					'payment_method': '',
 					'total_amount': 0.0,
 					'transaction_date': None,
-					'transaction_status': status_raw or 'مكتمل',
+					'transaction_status': status_raw,
 					'has_exception': False,
 					'exception_reasons': []
 				}
@@ -214,7 +215,7 @@ def process_bir_file(file_path, batch_id=None):
 					'payment_method': pay_method_raw,
 					'total_amount': tot_amt,
 					'transaction_date': date_raw,
-					'transaction_status': status_raw or 'مكتمل',
+					'transaction_status': status_raw,
 					'has_exception': False,
 					'exception_reasons': []
 				}
@@ -246,7 +247,7 @@ def process_bir_file(file_path, batch_id=None):
 				'payment_method': pay_method_raw,
 				'total_amount': tot_amt,
 				'transaction_date': date_raw,
-				'transaction_status': status_raw or 'مكتمل',
+				'transaction_status': status_raw,
 				'has_exception': True,
 				'exception_reasons': ["رقم المعاملة مفقود من المصدر."]
 			}
@@ -307,27 +308,36 @@ def process_bir_file(file_path, batch_id=None):
 		doc.phone = item['phone']
 		doc.payment_method = item['payment_method'] or "تحويل مصرفي"
 		doc.total_amount = item['total_amount']
-		doc.transaction_status = item['transaction_status']
+		
+		# Validate transaction_status option
+		st = item['transaction_status']
+		if st not in ['مكتمل', 'معلق', 'ملغى']:
+			st = 'مكتمل'
+		doc.transaction_status = st
+
 		doc.is_basket = 1 if is_basket else 0
 		doc.basket_items_count = len(item['projects'])
 		doc.has_exception = 1 if has_exception else 0
 		doc.exception_reason = " ".join(reasons).strip()
 
+		# Datetime parsing fix
+		doc.transaction_date = None
 		if item['transaction_date']:
-			try:
-				dt_str = item['transaction_date'].strip()
-				if '/' in dt_str:
-					parts = dt_str.split(' ')
-					d_parts = parts[0].split('/')
-					if len(d_parts) == 3:
-						formatted_dt = f"{d_parts[2]}-{int(d_parts[1]):02d}-{int(d_parts[0]):02d}"
-						if len(parts) > 1:
-							formatted_dt += f" {parts[1]}:00"
-						doc.transaction_date = formatted_dt
-				else:
-					doc.transaction_date = dt_str
-			except Exception:
-				pass
+			dt_str = str(item['transaction_date']).strip()
+			if dt_str and dt_str != '-':
+				try:
+					if '/' in dt_str:
+						parts = dt_str.split(' ')
+						d_parts = parts[0].split('/')
+						if len(d_parts) == 3:
+							formatted_dt = f"{d_parts[2]}-{int(d_parts[1]):02d}-{int(d_parts[0]):02d}"
+							if len(parts) > 1:
+								formatted_dt += f" {parts[1]}:00"
+							doc.transaction_date = formatted_dt
+					else:
+						doc.transaction_date = dt_str
+				except Exception:
+					doc.transaction_date = None
 
 		doc.set("basket_projects", [])
 		for p in item['projects']:
