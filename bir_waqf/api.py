@@ -42,24 +42,62 @@ def get_all_projects_for_multiselect(txt=None):
 	return results
 
 @frappe.whitelist()
-def get_batch_transactions_by_bank(import_batch, bank=None, project=None):
+def get_batch_transactions_by_bank(import_batch, bank=None, projects=None):
 	"""
-	Fetches Bir Transactions filtered by import_batch, bank, and optional project.
+	Fetches Bir Transactions filtered strictly by import_batch, bank, and optional multi-selected projects.
 	"""
+	if isinstance(projects, str):
+		if projects.startswith("["):
+			try:
+				projects = json.loads(projects)
+			except Exception:
+				projects = [p.strip() for p in projects.split(",") if p.strip()]
+		else:
+			projects = [p.strip() for p in projects.split(",") if p.strip()]
+
+	if not projects:
+		projects = []
+
+	resolved_projects = set()
+	for p in projects:
+		resolved_projects.update(resolve_project_tokens(p))
+
 	filters = {"import_batch": import_batch}
 	if bank and str(bank).strip():
 		filters["bank_name"] = str(bank).strip()
-	if project and str(project).strip():
-		p_val = str(project).strip()
-		p_id = frappe.db.get_value("Project", {"project_name": p_val}, "name") or p_val
-		filters["project"] = p_id
 
 	transactions = frappe.get_all(
 		"Bir Transaction",
 		filters=filters,
-		fields=["name", "transaction_id", "transfer_number", "donor_name", "total_amount", "transaction_date", "bank_name", "project", "has_exception"]
+		fields=["name", "transaction_id", "transfer_number", "donor_name", "total_amount", "transaction_date", "bank_name", "project", "is_basket", "has_exception"]
 	)
-	return transactions
+
+	filtered_txs = []
+	for tx in transactions:
+		if resolved_projects:
+			match_found = False
+			if tx.project:
+				p_val = str(tx.project).strip().lower()
+				p_title = (frappe.db.get_value("Project", tx.project, "project_name") or "").strip().lower()
+				if p_val in resolved_projects or p_title in resolved_projects:
+					match_found = True
+
+			if not match_found:
+				sub_projs = frappe.get_all("Bir Basket Project", filters={"parent": tx.name}, fields=["project_name"])
+				for sub in sub_projs:
+					s_val = str(sub.project_name).strip().lower()
+					s_title = (frappe.db.get_value("Project", sub.project_name, "project_name") or "").strip().lower()
+					if s_val in resolved_projects or s_title in resolved_projects:
+						match_found = True
+						break
+
+			if not match_found:
+				continue
+
+		tx["project_title"] = get_project_title(tx.project) if tx.project else "-"
+		filtered_txs.append(tx)
+
+	return filtered_txs
 
 @frappe.whitelist()
 def post_batch_transactions_to_entries(import_batch, bank=None, projects=None):
@@ -79,11 +117,9 @@ def post_batch_transactions_to_entries(import_batch, bank=None, projects=None):
 	if not projects:
 		projects = []
 
-	# Resolve all selected project IDs and titles into a set for fast lookup
 	resolved_projects = set()
 	for p in projects:
-		tokens = resolve_project_tokens(p)
-		resolved_projects.update(tokens)
+		resolved_projects.update(resolve_project_tokens(p))
 
 	filters = {"import_batch": import_batch}
 	if bank and str(bank).strip():
@@ -115,14 +151,12 @@ def post_batch_transactions_to_entries(import_batch, bank=None, projects=None):
 	for tx in txs:
 		if resolved_projects:
 			match_found = False
-			# 1. Check single transaction project
 			if tx.project:
 				p_val = str(tx.project).strip().lower()
 				p_title = (frappe.db.get_value("Project", tx.project, "project_name") or "").strip().lower()
 				if p_val in resolved_projects or p_title in resolved_projects:
 					match_found = True
 
-			# 2. Check child basket projects
 			if not match_found:
 				sub_projs = frappe.get_all("Bir Basket Project", filters={"parent": tx.name}, fields=["project_name"])
 				for sub in sub_projs:
@@ -195,14 +229,12 @@ def get_grouped_transactions_by_projects(import_batch, bank=None, projects=None)
 		if not tokens:
 			tokens = [clean_p.lower()]
 
-		# Query matching single transactions
 		txs_single = frappe.get_all(
 			"Bir Transaction",
 			filters={**filters, "is_basket": 0, "project": ["in", tokens]},
 			fields=["name", "transaction_id", "transfer_number", "donor_name", "total_amount", "transaction_date", "reconciliation_status"]
 		)
 
-		# Query matching basket sub-transactions
 		placeholders = ", ".join(["%s"] * len(tokens))
 		sql_query = f"""
 			SELECT t.name, t.transaction_id, t.transfer_number, t.donor_name, b.sub_amount as total_amount, t.transaction_date, t.reconciliation_status
@@ -243,9 +275,6 @@ def get_grouped_transactions_by_projects(import_batch, bank=None, projects=None)
 
 @frappe.whitelist()
 def toggle_transaction_reconciliation(transaction_id, is_reconciled):
-	"""
-	Toggles persistent reconciliation status in database when checkbox is clicked.
-	"""
 	if frappe.db.exists("Bir Transaction", transaction_id):
 		is_rec = int(is_reconciled) if str(is_reconciled).isdigit() else (1 if is_reconciled else 0)
 		status = "مطابق يدويًا" if is_rec else "غير مطابق"
@@ -259,9 +288,6 @@ def toggle_transaction_reconciliation(transaction_id, is_reconciled):
 
 @frappe.whitelist()
 def get_transaction_list_print_html(names=None):
-	"""
-	Generates an HTML print report displaying full Arabic Project Titles.
-	"""
 	if isinstance(names, str):
 		try:
 			names = json.loads(names)
@@ -297,7 +323,6 @@ def get_transaction_list_print_html(names=None):
 
 		dt_str = str(tx.transaction_date)[:16] if tx.transaction_date else "-"
 		
-		# Resolve Arabic Project Title
 		if tx.is_basket:
 			sub_projs = frappe.get_all("Bir Basket Project", filters={"parent": tx.name}, fields=["project_name"])
 			if sub_projs:
