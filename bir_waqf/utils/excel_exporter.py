@@ -1,132 +1,107 @@
-import frappe, openpyxl, io, json, base64
-from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+import openpyxl
+from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 from openpyxl.utils import get_column_letter
-from bir_waqf.utils.project_utils import get_project_title
+import io, json
+import frappe
+from bir_waqf.utils.project_utils import get_project_title, resolve_project_tokens
 
-def apply_excel_styling(ws):
+def build_transactions_excel(transactions):
 	"""
-	Applies RTL layout, auto column width, and freeze panes to an openpyxl worksheet.
-	"""
-	ws.views.sheetView[0].rightToLeft = True
-	ws.freeze_panes = "A2"
-
-	thin_border = Border(
-		left=Side(style='thin', color='D0D5DD'),
-		right=Side(style='thin', color='D0D5DD'),
-		top=Side(style='thin', color='D0D5DD'),
-		bottom=Side(style='thin', color='D0D5DD')
-	)
-
-	for col in ws.columns:
-		max_len = 0
-		col_letter = get_column_letter(col[0].column)
-		for cell in col:
-			cell.border = thin_border
-			val_str = str(cell.value or '')
-			if len(val_str) > max_len:
-				max_len = len(val_str)
-		ws.column_dimensions[col_letter].width = max(max_len + 5, 14)
-
-def build_transactions_excel(tx_list):
-	"""
-	Generates an openpyxl Workbook for selected transactions (with Arabic Project titles).
+	Generates an openpyxl Workbook in-memory for selected Bir Transactions.
+	Applies RTL direction, custom Arabic styling, and auto column width calculations.
 	"""
 	wb = openpyxl.Workbook()
 	ws = wb.active
 	ws.title = "المعاملات المحددة"
 
-	header_fill = PatternFill(start_color="0A4D2E", end_color="0A4D2E", fill_type="solid")
-	header_font = Font(name="Tajawal", size=11, bold=True, color="FFFFFF")
-	sub_header_fill = PatternFill(start_color="F0FDF4", end_color="F0FDF4", fill_type="solid")
-	sub_font = Font(name="Tajawal", size=10, italic=True, color="166534")
+	ws.views.sheetView[0].rightToLeft = True
+
+	title_fill = PatternFill(start_color="0A4D2E", end_color="0A4D2E", fill_type="solid")
+	title_font = Font(name="Tajawal", size=14, bold=True, color="FFFFFF")
+
+	header_fill = PatternFill(start_color="1E293B", end_color="1E293B", fill_type="solid")
+	header_font = Font(name="Tajawal", size=10, bold=True, color="FFFFFF")
+
+	thin_border = Border(
+		left=Side(style='thin', color='E2E8F0'),
+		right=Side(style='thin', color='E2E8F0'),
+		top=Side(style='thin', color='E2E8F0'),
+		bottom=Side(style='thin', color='E2E8F0')
+	)
+
+	ws.merge_cells("A1:I1")
+	ws["A1"] = "تقرير قائمة معاملات منصة البر الوقفية المحددة للمطابقة"
+	ws["A1"].fill = title_fill
+	ws["A1"].font = title_font
+	ws["A1"].alignment = Alignment(horizontal="center", vertical="center")
+	ws.row_dimensions[1].height = 35
+
+	ws.append([]) # empty row 2
 
 	headers = [
-		"#", "رقم المعاملة", "رقم طلب المساهمة", "رقم الحوالة/الصك",
-		"المستخدم / المتبرع", "المصرف", "طريقة الدفع", "المشروع",
-		"القيمة الإجمالية (د.ل)", "التاريخ", "حالة المطابقة", "نوع المعاملة"
+		"#", "رقم المعاملة", "رقم الحوالة / الصك", "اسم المتبرع",
+		"المصرف", "المشروع", "القيمة الإجمالية (د.ل)", "تاريخ المعاملة", "حالة المطابقة"
 	]
-	
 	ws.append(headers)
-	ws.row_dimensions[1].height = 26
+	ws.row_dimensions[3].height = 25
 
-	for col_idx in range(1, len(headers) + 1):
-		cell = ws.cell(row=1, column=col_idx)
+	for col_num in range(1, len(headers) + 1):
+		cell = ws.cell(row=3, column=col_num)
 		cell.fill = header_fill
 		cell.font = header_font
 		cell.alignment = Alignment(horizontal="center", vertical="center")
+		cell.border = thin_border
 
-	row_num = 2
-	for idx, tx in enumerate(tx_list, 1):
-		tx_doc = frappe.get_doc("Bir Transaction", tx.name)
-		is_basket = bool(tx_doc.is_basket)
-		tx_type = "سلة مشاريع" if is_basket else "معاملة مفردة"
-
-		if is_basket:
-			sub_projs = tx_doc.basket_projects or []
+	for idx, tx_info in enumerate(transactions, 1):
+		tx = frappe.get_doc("Bir Transaction", tx_info.get("name") or tx_info.get("transaction_id"))
+		
+		proj_display = "-"
+		if tx.is_basket:
+			sub_projs = tx.basket_projects or []
 			if sub_projs:
-				proj_titles = [get_project_title(p.project_name) for p in sub_projs if p.project_name]
-				proj_display = ", ".join(proj_titles)
-			else:
-				proj_display = "-"
+				titles = [get_project_title(p.project_name) for p in sub_projs if p.project_name]
+				proj_display = ", ".join(titles)
 		else:
-			if tx_doc.project:
-				proj_display = get_project_title(tx_doc.project)
-			else:
-				if tx_doc.basket_projects:
-					proj_display = get_project_title(tx_doc.basket_projects[0].project_name)
-				else:
-					proj_display = "-"
+			if tx.project:
+				proj_display = get_project_title(tx.project)
 
-		dt_str = str(tx_doc.transaction_date)[:16] if tx_doc.transaction_date else "-"
+		dt_str = str(tx.transaction_date)[:16] if tx.transaction_date else "-"
+		rec_status = tx.reconciliation_status or "غير مطابق"
 
-		main_row = [
+		row_data = [
 			idx,
-			tx_doc.transaction_id or "-",
-			tx_doc.contribution_request_id or "-",
-			tx_doc.transfer_number or "-",
-			tx_doc.donor_name or "فاعل خير",
-			tx_doc.bank_name or "-",
-			tx_doc.payment_method or "-",
+			tx.transaction_id or "-",
+			tx.transfer_number or "-",
+			tx.donor_name or "فاعل خير",
+			tx.bank_name or "-",
 			proj_display,
-			float(tx_doc.total_amount or 0.0),
+			tx.total_amount or 0.0,
 			dt_str,
-			tx_doc.reconciliation_status or "غير مطابق",
-			tx_type
+			rec_status
 		]
-		ws.append(main_row)
-		ws.cell(row=row_num, column=9).number_format = '#,##0.00 "د.ل"'
-		ws.row_dimensions[row_num].height = 22
-		row_num += 1
+		ws.append(row_data)
 
-		# If basket transaction, append indented sub-rows for projects with titles
-		if is_basket and tx_doc.basket_projects:
-			for sub_idx, sub in enumerate(tx_doc.basket_projects, 1):
-				sub_title = get_project_title(sub.project_name)
-				sub_row = [
-					f"  └ {idx}.{sub_idx}",
-					"-",
-					"-",
-					"-",
-					f"↳ فرعي: {sub_title}",
-					"-",
-					"-",
-					sub_title,
-					float(sub.sub_amount or 0.0),
-					"-",
-					"-",
-					"مشروع فرعي"
-				]
-				ws.append(sub_row)
-				ws.cell(row=row_num, column=9).number_format = '#,##0.00 "د.ل"'
-				ws.row_dimensions[row_num].height = 20
-				for c in range(1, len(sub_row) + 1):
-					cell = ws.cell(row=row_num, column=c)
-					cell.fill = sub_header_fill
-					cell.font = sub_font
-				row_num += 1
+		row_idx = ws.max_row
+		ws.row_dimensions[row_idx].height = 20
+		for col_num in range(1, len(headers) + 1):
+			c = ws.cell(row=row_idx, column=col_num)
+			c.border = thin_border
+			c.alignment = Alignment(horizontal="right", vertical="center")
+			if col_num in [1, 8, 9]:
+				c.alignment = Alignment(horizontal="center", vertical="center")
+			if col_num == 7:
+				c.number_format = '#,##0.00 "د.ل"'
+				c.font = Font(name="Tajawal", bold=True, color="0A4D2E")
 
-	apply_excel_styling(ws)
-	
+	for col in ws.columns:
+		max_len = 0
+		col_letter = get_column_letter(col[0].column)
+		for cell in col:
+			val_str = str(cell.value or "")
+			if cell.row > 1 and len(val_str) > max_len:
+				max_len = len(val_str)
+		ws.column_dimensions[col_letter].width = max(max_len + 4, 12)
+
 	output = io.BytesIO()
 	wb.save(output)
 	return output.getvalue()
@@ -135,11 +110,13 @@ def build_transactions_excel(tx_list):
 def build_grouped_bank_statement_excel(import_batch, bank, selected_projects):
 	"""
 	Generates an openpyxl Workbook grouped by Project for Quick Entry / Bank Reconciliation.
-	Displays Arabic Project Titles.
+	Displays Arabic Project Titles and resolves project tokens.
 	"""
 	wb = openpyxl.Workbook()
 	ws = wb.active
 	ws.title = "كشف حساب المصرف - المشاريع"
+
+	ws.views.sheetView[0].rightToLeft = True
 
 	title_fill = PatternFill(start_color="0A4D2E", end_color="0A4D2E", fill_type="solid")
 	title_font = Font(name="Tajawal", size=13, bold=True, color="FFFFFF")
@@ -152,6 +129,13 @@ def build_grouped_bank_statement_excel(import_batch, bank, selected_projects):
 
 	header_fill = PatternFill(start_color="1E293B", end_color="1E293B", fill_type="solid")
 	header_font = Font(name="Tajawal", size=10, bold=True, color="FFFFFF")
+
+	thin_border = Border(
+		left=Side(style='thin', color='CBD5E1'),
+		right=Side(style='thin', color='CBD5E1'),
+		top=Side(style='thin', color='CBD5E1'),
+		bottom=Side(style='thin', color='CBD5E1')
+	)
 
 	# Title Banner
 	ws.merge_cells("A1:G1")
@@ -171,6 +155,7 @@ def build_grouped_bank_statement_excel(import_batch, bank, selected_projects):
 		cell.fill = header_fill
 		cell.font = header_font
 		cell.alignment = Alignment(horizontal="center", vertical="center")
+		cell.border = thin_border
 
 	filters = {}
 	if import_batch and str(import_batch).strip():
@@ -198,24 +183,30 @@ def build_grouped_bank_statement_excel(import_batch, bank, selected_projects):
 
 		clean_p = str(p_input).strip()
 		p_title = get_project_title(clean_p)
-		p_id = frappe.db.get_value("Project", {"project_name": clean_p}, "name") or clean_p
+		tokens = list(resolve_project_tokens(clean_p))
 
-		# Query matching single and basket transactions
+		if not tokens:
+			tokens = [clean_p.lower()]
+
+		# Query matching single and basket transactions using tokens
 		txs_single = frappe.get_all(
 			"Bir Transaction",
-			filters={**filters, "is_basket": 0, "project": ["in", [clean_p, p_id, p_title]]},
+			filters={**filters, "is_basket": 0, "project": ["in", tokens]},
 			fields=["name", "transaction_id", "transfer_number", "donor_name", "total_amount", "transaction_date", "reconciliation_status"]
 		)
 
-		txs_basket_rows = frappe.db.sql("""
+		placeholders = ", ".join(["%s"] * len(tokens))
+		sql_query = f"""
 			SELECT t.name, t.transaction_id, t.transfer_number, t.donor_name, b.sub_amount as total_amount, t.transaction_date, t.reconciliation_status
 			FROM `tabBir Transaction` t
 			INNER JOIN `tabBir Basket Project` b ON b.parent = t.name
 			WHERE t.is_basket = 1
-			""" + (" AND t.import_batch = %s" if import_batch else "") + """
-			""" + (" AND t.bank_name = %s" if bank else "") + """
-			AND (b.project_name IN (%s, %s, %s) OR LOWER(TRIM(b.project_name)) = LOWER(%s))
-		""", tuple([v for v in [import_batch, bank] if v] + [clean_p, p_id, p_title, clean_p]), as_dict=True) or []
+			{" AND t.import_batch = %s" if import_batch else ""}
+			{" AND t.bank_name = %s" if bank else ""}
+			AND LOWER(TRIM(b.project_name)) IN ({placeholders})
+		"""
+		params = [v for v in [import_batch, bank] if v] + tokens
+		txs_basket_rows = frappe.db.sql(sql_query, tuple(params), as_dict=True) or []
 
 		all_project_txs = txs_single + txs_basket_rows
 
@@ -248,6 +239,10 @@ def build_grouped_bank_statement_excel(import_batch, bank, selected_projects):
 			ws.append(row_vals)
 			ws.cell(row=cur_row, column=5).number_format = '#,##0.00 "د.ل"'
 			ws.cell(row=cur_row, column=7).alignment = Alignment(horizontal="center")
+			
+			for c_col in range(1, 8):
+				ws.cell(row=cur_row, column=c_col).border = thin_border
+
 			ws.row_dimensions[cur_row].height = 20
 			cur_row += 1
 
@@ -259,21 +254,27 @@ def build_grouped_bank_statement_excel(import_batch, bank, selected_projects):
 		ws.cell(row=cur_row, column=1).alignment = Alignment(horizontal="left", vertical="center")
 
 		ws.cell(row=cur_row, column=5).value = proj_sum
-		ws.cell(row=cur_row, column=5).number_format = '#,##0.00 "د.ل"'
 		ws.cell(row=cur_row, column=5).fill = subtotal_fill
 		ws.cell(row=cur_row, column=5).font = subtotal_font
+		ws.cell(row=cur_row, column=5).number_format = '#,##0.00 "د.ل"'
 
-		for col_c in range(6, 8):
-			cell = ws.cell(row=cur_row, column=col_c)
-			cell.fill = subtotal_fill
+		ws.merge_cells(start_row=cur_row, start_column=6, end_row=cur_row, end_column=7)
+		ws.cell(row=cur_row, column=6).fill = subtotal_fill
+
+		for c_col in range(1, 8):
+			ws.cell(row=cur_row, column=c_col).border = thin_border
 
 		ws.row_dimensions[cur_row].height = 22
-		cur_row += 1
+		cur_row += 2
 
-		ws.append([])
-		cur_row += 1
-
-	apply_excel_styling(ws)
+	for col in ws.columns:
+		max_len = 0
+		col_letter = get_column_letter(col[0].column)
+		for cell in col:
+			val_str = str(cell.value or "")
+			if cell.row > 1 and len(val_str) > max_len:
+				max_len = len(val_str)
+		ws.column_dimensions[col_letter].width = max(max_len + 4, 15)
 
 	output = io.BytesIO()
 	wb.save(output)
