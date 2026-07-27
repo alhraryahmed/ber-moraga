@@ -24,7 +24,24 @@ frappe.listview_settings['Bir Transaction'] = {
 						label: __('تصفية حسب المشاريع (متعدد التحديد - اختياري)'),
 						fieldname: 'projects',
 						fieldtype: 'MultiSelect',
-						options: 'Project',
+						get_data: function(txt) {
+							return frappe.call({
+								method: 'frappe.desk.search.search_link',
+								args: {
+									doctype: 'Project',
+									txt: txt || '',
+									page_length: 50
+								}
+							}).then(function(r) {
+								return (r.results || []).map(function(item) {
+									var label_str = item.description ? (item.description + ' (' + item.value + ')') : item.value;
+									return {
+										value: item.value,
+										label: label_str
+									};
+								});
+							});
+						},
 						description: __('اختر مشروعاً أو أكثر لترحيل تبرعاتها، أو اتركه فارغاً لترحيل كافة المشاريع')
 					}
 				],
