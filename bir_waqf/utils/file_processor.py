@@ -1,6 +1,7 @@
 import frappe, os, re, json
 import pandas as pd
 from frappe.utils import nowdate, getdate, now_datetime
+from bir_waqf.utils.project_utils import get_or_create_project
 
 def parse_project_line(line):
 	"""
@@ -341,10 +342,15 @@ def process_bir_file(file_path, batch_id=None):
 
 		doc.set("basket_projects", [])
 		for p in item['projects']:
+			proj_name = p['project_name']
+			proj_link = get_or_create_project(proj_name)
 			doc.append("basket_projects", {
-				"project_name": p['project_name'],
+				"project_name": proj_link or proj_name,
 				"sub_amount": p['sub_amount']
 			})
+
+		if not is_basket and item['projects']:
+			doc.project = get_or_create_project(item['projects'][0]['project_name'])
 
 		doc.flags.ignore_permissions = True
 		doc.save()

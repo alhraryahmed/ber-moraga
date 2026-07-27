@@ -132,5 +132,25 @@ frappe.listview_settings['Bir Transaction'] = {
 				}
 			});
 		}).addClass('btn-default');
+
+		// Export Excel Button for Selected Transactions
+		listview.page.add_inner_button(__('تصدير إكسل للمعاملات المحددة'), function() {
+			var selected = listview.get_checked_items();
+			var names = selected && selected.length ? selected.map(function(item) { return item.name; }) : null;
+			
+			frappe.show_alert({message: __('جاري توليد ملف الإكسل للمعاملات المحددة...'), indicator: 'blue'});
+			
+			frappe.call({
+				method: 'bir_waqf.api.export_selected_transactions_excel',
+				args: {
+					names: names
+				},
+				callback: function(r) {
+					if (r.message && r.message.file_url) {
+						window.open(r.message.file_url, '_blank');
+					}
+				}
+			});
+		}).addClass('btn-success');
 	}
 };

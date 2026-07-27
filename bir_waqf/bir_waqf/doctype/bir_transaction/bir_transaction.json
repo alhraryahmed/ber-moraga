@@ -10,6 +10,7 @@
     "contribution_request_id",
     "transfer_number",
     "bank_name",
+    "project",
     "cb1",
     "donor_name",
     "phone",
@@ -32,32 +33,40 @@
     {
       "fieldname": "transaction_id",
       "fieldtype": "Data",
+      "in_list_view": 1,
+      "in_standard_filter": 1,
       "label": "رقم المعاملة",
       "reqd": 1,
-      "unique": 1,
-      "in_list_view": 1,
-      "in_standard_filter": 1
+      "unique": 1
     },
     {
       "fieldname": "contribution_request_id",
       "fieldtype": "Data",
-      "label": "رقم طلب المساهمة",
       "in_list_view": 1,
-      "in_standard_filter": 1
+      "in_standard_filter": 1,
+      "label": "رقم طلب المساهمة"
     },
     {
       "fieldname": "transfer_number",
       "fieldtype": "Data",
-      "label": "رقم الحوالة/الصك",
       "in_list_view": 1,
-      "in_standard_filter": 1
+      "in_standard_filter": 1,
+      "label": "رقم الحوالة/الصك"
     },
     {
       "fieldname": "bank_name",
       "fieldtype": "Data",
-      "label": "المصرف",
       "in_list_view": 1,
-      "in_standard_filter": 1
+      "in_standard_filter": 1,
+      "label": "المصرف"
+    },
+    {
+      "fieldname": "project",
+      "fieldtype": "Link",
+      "in_list_view": 1,
+      "in_standard_filter": 1,
+      "label": "المشروع",
+      "options": "Project"
     },
     {
       "fieldname": "cb1",
@@ -66,8 +75,8 @@
     {
       "fieldname": "donor_name",
       "fieldtype": "Data",
-      "label": "المستخدم / المتبرع",
-      "in_list_view": 1
+      "in_list_view": 1,
+      "label": "المستخدم / المتبرع"
     },
     {
       "fieldname": "phone",
@@ -82,10 +91,10 @@
     {
       "fieldname": "import_batch",
       "fieldtype": "Link",
-      "label": "دفعة الاستيراد",
-      "options": "Bir Import Batch",
       "in_list_view": 1,
-      "in_standard_filter": 1
+      "in_standard_filter": 1,
+      "label": "دفعة الاستيراد",
+      "options": "Bir Import Batch"
     },
     {
       "fieldname": "cb2",
@@ -94,32 +103,32 @@
     {
       "fieldname": "total_amount",
       "fieldtype": "Currency",
-      "label": "القيمة الإجمالية",
       "in_list_view": 1,
+      "label": "القيمة الإجمالية",
       "reqd": 1
     },
     {
       "fieldname": "transaction_date",
       "fieldtype": "Datetime",
-      "label": "تاريخ المعاملة",
-      "in_list_view": 1
+      "in_list_view": 1,
+      "label": "تاريخ المعاملة"
     },
     {
       "fieldname": "transaction_status",
-      "fieldtype": "Select",
-      "label": "حالة المعاملة",
-      "options": "مكتمل\nمعلق\nملغى",
       "default": "مكتمل",
-      "in_list_view": 1
+      "fieldtype": "Select",
+      "in_list_view": 1,
+      "label": "حالة المعاملة",
+      "options": "مكتمل\nمعلق\nملغى"
     },
     {
       "fieldname": "reconciliation_status",
-      "fieldtype": "Select",
-      "label": "حالة المطابقة المصرفية",
-      "options": "غير مطابق\nمطابق آليًا\nمطابق يدويًا\nيحتاج مراجعة",
       "default": "غير مطابق",
+      "fieldtype": "Select",
       "in_list_view": 1,
-      "in_standard_filter": 1
+      "in_standard_filter": 1,
+      "label": "حالة المطابقة المصرفية",
+      "options": "غير مطابق\nمطابق آليًا\nمطابق يدويًا\nيحتاج مراجعة"
     },
     {
       "fieldname": "section_basket",
@@ -129,15 +138,15 @@
     {
       "fieldname": "is_basket",
       "fieldtype": "Check",
-      "label": "معاملة سلة",
       "in_list_view": 1,
-      "in_standard_filter": 1
+      "in_standard_filter": 1,
+      "label": "معاملة سلة"
     },
     {
       "fieldname": "basket_items_count",
+      "default": "0",
       "fieldtype": "Int",
-      "label": "عدد مشاريع السلة",
-      "default": "0"
+      "label": "عدد مشاريع السلة"
     },
     {
       "fieldname": "basket_projects",
@@ -153,9 +162,9 @@
     {
       "fieldname": "has_exception",
       "fieldtype": "Check",
-      "label": "توجد استثناءات / شك",
       "in_list_view": 1,
-      "in_standard_filter": 1
+      "in_standard_filter": 1,
+      "label": "توجد استثناءات / شك"
     },
     {
       "fieldname": "exception_reason",
@@ -181,7 +190,7 @@
       "write": 1
     }
   ],
-  "search_fields": "transaction_id, contribution_request_id, transfer_number, donor_name, phone, import_batch",
+  "search_fields": "transaction_id, contribution_request_id, transfer_number, donor_name, phone, import_batch, project",
   "sort_field": "modified",
   "sort_order": "DESC",
   "title_field": "donor_name"

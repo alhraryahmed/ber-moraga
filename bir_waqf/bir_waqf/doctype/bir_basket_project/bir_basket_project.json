@@ -11,9 +11,10 @@
   "fields": [
     {
       "fieldname": "project_name",
-      "fieldtype": "Data",
+      "fieldtype": "Link",
       "in_list_view": 1,
       "label": "اسم المشروع",
+      "options": "Project",
       "reqd": 1
     },
     {
