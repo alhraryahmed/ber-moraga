@@ -3,7 +3,7 @@ from bir_waqf.utils.file_processor import process_bir_file
 from bir_waqf.utils.bank_statement_processor import process_bank_statement_file
 from bir_waqf.utils.reconciliation import reconcile_bank_statement
 from bir_waqf.utils.excel_exporter import build_transactions_excel, build_grouped_bank_statement_excel
-from bir_waqf.utils.project_utils import get_or_create_project, get_project_title
+from bir_waqf.utils.project_utils import get_or_create_project, get_project_title, resolve_project_tokens
 
 @frappe.whitelist()
 def process_uploaded_file(file_url, batch_id=None):
@@ -82,16 +82,8 @@ def post_batch_transactions_to_entries(import_batch, bank=None, projects=None):
 	# Resolve all selected project IDs and titles into a set for fast lookup
 	resolved_projects = set()
 	for p in projects:
-		if not p or not str(p).strip():
-			continue
-		p_clean = str(p).strip()
-		resolved_projects.add(p_clean.lower())
-		p_title = frappe.db.get_value("Project", p_clean, "project_name")
-		if p_title:
-			resolved_projects.add(str(p_title).strip().lower())
-		p_id = frappe.db.get_value("Project", {"project_name": p_clean}, "name")
-		if p_id:
-			resolved_projects.add(str(p_id).strip().lower())
+		tokens = resolve_project_tokens(p)
+		resolved_projects.update(tokens)
 
 	filters = {"import_batch": import_batch}
 	if bank and str(bank).strip():
@@ -198,25 +190,31 @@ def get_grouped_transactions_by_projects(import_batch, bank=None, projects=None)
 
 		clean_p = str(p_input).strip()
 		p_title = get_project_title(clean_p)
-		p_id = frappe.db.get_value("Project", {"project_name": clean_p}, "name") or clean_p
+		tokens = list(resolve_project_tokens(clean_p))
+
+		if not tokens:
+			tokens = [clean_p.lower()]
 
 		# Query matching single transactions
 		txs_single = frappe.get_all(
 			"Bir Transaction",
-			filters={**filters, "is_basket": 0, "project": ["in", [clean_p, p_id, p_title]]},
+			filters={**filters, "is_basket": 0, "project": ["in", tokens]},
 			fields=["name", "transaction_id", "transfer_number", "donor_name", "total_amount", "transaction_date", "reconciliation_status"]
 		)
 
 		# Query matching basket sub-transactions
-		txs_basket_rows = frappe.db.sql("""
+		placeholders = ", ".join(["%s"] * len(tokens))
+		sql_query = f"""
 			SELECT t.name, t.transaction_id, t.transfer_number, t.donor_name, b.sub_amount as total_amount, t.transaction_date, t.reconciliation_status
 			FROM `tabBir Transaction` t
 			INNER JOIN `tabBir Basket Project` b ON b.parent = t.name
 			WHERE t.is_basket = 1
-			""" + (" AND t.import_batch = %s" if import_batch else "") + """
-			""" + (" AND t.bank_name = %s" if bank else "") + """
-			AND (b.project_name IN (%s, %s, %s) OR LOWER(TRIM(b.project_name)) = LOWER(%s))
-		""", tuple([v for v in [import_batch, bank] if v] + [clean_p, p_id, p_title, clean_p]), as_dict=True) or []
+			{" AND t.import_batch = %s" if import_batch else ""}
+			{" AND t.bank_name = %s" if bank else ""}
+			AND LOWER(TRIM(b.project_name)) IN ({placeholders})
+		"""
+		params = [v for v in [import_batch, bank] if v] + tokens
+		txs_basket_rows = frappe.db.sql(sql_query, tuple(params), as_dict=True) or []
 
 		items = txs_single + txs_basket_rows
 		total_sub = sum(float(i.total_amount or 0.0) for i in items)

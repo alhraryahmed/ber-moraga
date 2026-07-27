@@ -1,4 +1,4 @@
-import frappe
+import frappe, re
 
 def get_or_create_project(project_name):
 	"""
@@ -48,14 +48,45 @@ def get_project_title(project_name_or_id):
 
 	val = str(project_name_or_id).strip()
 
-	# If val is a Project ID (e.g. PROJ-0001), fetch project_name field
 	title = frappe.db.get_value("Project", val, "project_name")
 	if title and str(title).strip():
 		return str(title).strip()
 
-	# Check if val matches project_name
 	by_title = frappe.db.get_value("Project", {"project_name": val}, "project_name")
 	if by_title and str(by_title).strip():
 		return str(by_title).strip()
 
 	return val
+
+def resolve_project_tokens(p_str):
+	"""
+	Given any project input string (e.g. 'PROJ-0001', 'مشروع كذا', or 'مشروع كذا (PROJ-0001)'),
+	returns set of matching project IDs and titles (in lowercase) for database matching.
+	"""
+	tokens = set()
+	if not p_str or not str(p_str).strip():
+		return tokens
+
+	text = str(p_str).strip()
+	tokens.add(text.lower())
+
+	match_id = re.search(r'\((PROJ-[0-9]+)\)', text)
+	if match_id:
+		proj_id = match_id.group(1).strip()
+		tokens.add(proj_id.lower())
+		title = frappe.db.get_value("Project", proj_id, "project_name")
+		if title:
+			tokens.add(str(title).strip().lower())
+
+	raw_title = text.split('(')[0].strip()
+	if raw_title:
+		tokens.add(raw_title.lower())
+		p_id = frappe.db.get_value("Project", {"project_name": raw_title}, "name")
+		if p_id:
+			tokens.add(str(p_id).strip().lower())
+
+	p_title = frappe.db.get_value("Project", text, "project_name")
+	if p_title:
+		tokens.add(str(p_title).strip().lower())
+
+	return tokens
