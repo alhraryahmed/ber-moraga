@@ -1,9 +1,9 @@
 frappe.listview_settings['Bir Transaction'] = {
 	onload: function(listview) {
-		// Post to Statement Entries Dialog Button (By Import Batch & Bank)
+		// Post to Statement Entries Dialog Button (By Import Batch, Bank & Project)
 		listview.page.add_inner_button(__('ترحيل الدفعة والمصرف للمطابقة'), function() {
 			var d = new frappe.ui.Dialog({
-				title: __('ترحيل معاملات (الدفعة + المصرف) إلى بنود كشف الحساب'),
+				title: __('ترحيل معاملات (الدفعة + المصرف + المشروع) إلى كشف الحساب'),
 				fields: [
 					{
 						label: __('اختر دفعة الاستيراد (Import Batch)'),
@@ -19,17 +19,25 @@ frappe.listview_settings['Bir Transaction'] = {
 						fieldtype: 'Link',
 						options: 'Bank',
 						description: __('اختر المصرف لترحيل معاملات هذا المصرف فقط داخل كشف حسابه')
+					},
+					{
+						label: __('تصفية حسب المشروع (اختياري)'),
+						fieldname: 'project',
+						fieldtype: 'Link',
+						options: 'Project',
+						description: __('اختر مشروعاً محدداً لترحيله أو اتركه فارغاً لترحيل كافة المشاريع')
 					}
 				],
 				primary_action_label: __('إنشاء/ترحيل الآن إلى كشف الحساب'),
 				primary_action: function(values) {
 					d.hide();
-					frappe.show_alert({message: __('جاري ترحيل معاملات المصرف والدفعة إلى كشف الحساب...'), indicator: 'blue'});
+					frappe.show_alert({message: __('جاري ترحيل معاملات المصرف والدفعة والمشروع إلى كشف الحساب...'), indicator: 'blue'});
 					frappe.call({
 						method: 'bir_waqf.api.post_batch_transactions_to_entries',
 						args: {
 							import_batch: values.import_batch,
-							bank: values.bank
+							bank: values.bank,
+							project: values.project
 						},
 						callback: function(r) {
 							if (r.message && r.message.status === 'success') {

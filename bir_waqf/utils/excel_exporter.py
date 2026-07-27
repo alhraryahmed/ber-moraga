@@ -59,7 +59,12 @@ def build_transactions_excel(tx_list):
 		tx_doc = frappe.get_doc("Bir Transaction", tx.name)
 		is_basket = bool(tx_doc.is_basket)
 		tx_type = "سلة مشاريع" if is_basket else "معاملة مفردة"
-		proj_display = tx_doc.project or "-"
+		proj_display = tx_doc.project
+		if not proj_display:
+			if tx_doc.basket_projects:
+				proj_display = ", ".join(p.project_name for p in tx_doc.basket_projects if p.project_name)
+			else:
+				proj_display = "-"
 		dt_str = str(tx_doc.transaction_date)[:16] if tx_doc.transaction_date else "-"
 
 		main_row = [

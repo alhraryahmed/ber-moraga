@@ -3,6 +3,7 @@ from bir_waqf.utils.file_processor import process_bir_file
 from bir_waqf.utils.bank_statement_processor import process_bank_statement_file
 from bir_waqf.utils.reconciliation import reconcile_bank_statement
 from bir_waqf.utils.excel_exporter import build_transactions_excel, build_grouped_bank_statement_excel
+from bir_waqf.utils.project_utils import get_or_create_project
 
 @frappe.whitelist()
 def process_uploaded_file(file_url, batch_id=None):
@@ -12,13 +13,15 @@ def process_uploaded_file(file_url, batch_id=None):
 	return res
 
 @frappe.whitelist()
-def get_batch_transactions_by_bank(import_batch, bank=None):
+def get_batch_transactions_by_bank(import_batch, bank=None, project=None):
 	"""
-	Fetches Bir Transactions filtered strictly by import_batch and bank.
+	Fetches Bir Transactions filtered by import_batch, bank, and optional project.
 	"""
 	filters = {"import_batch": import_batch}
-	if bank and bank.strip():
-		filters["bank_name"] = bank.strip()
+	if bank and str(bank).strip():
+		filters["bank_name"] = str(bank).strip()
+	if project and str(project).strip():
+		filters["project"] = str(project).strip()
 
 	transactions = frappe.get_all(
 		"Bir Transaction",
@@ -26,6 +29,78 @@ def get_batch_transactions_by_bank(import_batch, bank=None):
 		fields=["name", "transaction_id", "transfer_number", "donor_name", "total_amount", "transaction_date", "bank_name", "project", "has_exception"]
 	)
 	return transactions
+
+@frappe.whitelist()
+def post_batch_transactions_to_entries(import_batch, bank=None, project=None):
+	"""
+	Creates or updates a Bir Bank Statement for the batch, bank & optional project,
+	and posts matching Bir Transactions as statement entries.
+	"""
+	filters = {"import_batch": import_batch}
+	if bank and str(bank).strip():
+		filters["bank_name"] = str(bank).strip()
+		stmt_title = f"كشف حساب {str(bank).strip()} - {import_batch}"
+	else:
+		stmt_title = f"كشف حساب عام - {import_batch}"
+
+	if project and str(project).strip():
+		clean_p = str(project).strip()
+		stmt_title += f" ({clean_p})"
+
+	if frappe.db.exists("Bir Bank Statement", stmt_title):
+		doc = frappe.get_doc("Bir Bank Statement", stmt_title)
+	else:
+		doc = frappe.new_doc("Bir Bank Statement")
+		doc.statement_name = stmt_title
+		if bank and str(bank).strip() and frappe.db.exists("Bank", str(bank).strip()):
+			doc.bank = str(bank).strip()
+
+	existing_refs = set(e.reference_number for e in (doc.entries or []))
+
+	txs = frappe.get_all(
+		"Bir Transaction",
+		filters=filters,
+		fields=["name", "transaction_id", "transfer_number", "donor_name", "total_amount", "transaction_date", "project", "is_basket"]
+	)
+
+	added_count = 0
+	for tx in txs:
+		if project and str(project).strip():
+			clean_p = str(project).strip()
+			if tx.is_basket:
+				has_proj = frappe.db.sql("""
+					SELECT name FROM `tabBir Basket Project`
+					WHERE parent = %s AND (project_name = %s OR LOWER(TRIM(project_name)) = LOWER(%s))
+					LIMIT 1
+				""", (tx.name, clean_p, clean_p))
+				if not has_proj:
+					continue
+			else:
+				if not tx.project or str(tx.project).strip().lower() != clean_p.lower():
+					continue
+
+		ref = tx.transfer_number or tx.transaction_id
+		if ref and ref not in existing_refs:
+			doc.append("entries", {
+				"reference_number": ref,
+				"posting_date": str(tx.transaction_date)[:10] if tx.transaction_date else None,
+				"description": f"{tx.donor_name or 'متبرع'} - {tx.transaction_id}",
+				"amount": tx.total_amount,
+				"is_reconciled": 0,
+				"matched_transaction": tx.name
+			})
+			existing_refs.add(ref)
+			added_count += 1
+
+	doc.flags.ignore_permissions = True
+	doc.save()
+	frappe.db.commit()
+
+	return {
+		"status": "success",
+		"statement_name": doc.name,
+		"added_count": added_count
+	}
 
 @frappe.whitelist()
 def get_grouped_transactions_by_projects(import_batch, bank=None, projects=None):
@@ -56,14 +131,12 @@ def get_grouped_transactions_by_projects(import_batch, bank=None, projects=None)
 
 		clean_p = str(p_name).strip()
 
-		# Single transactions for this project
 		txs_single = frappe.get_all(
 			"Bir Transaction",
 			filters={**filters, "is_basket": 0, "project": clean_p},
 			fields=["name", "transaction_id", "transfer_number", "donor_name", "total_amount", "transaction_date", "reconciliation_status"]
 		)
 
-		# Basket sub-transactions for this project
 		txs_basket_rows = frappe.db.sql("""
 			SELECT t.name, t.transaction_id, t.transfer_number, t.donor_name, b.sub_amount as total_amount, t.transaction_date, t.reconciliation_status
 			FROM `tabBir Transaction` t
@@ -154,7 +227,16 @@ def get_transaction_list_print_html(names=None):
 		rec_badge = f'<span style="color:{status_color};font-weight:bold;">{tx.reconciliation_status or "غير مطابق"}</span>'
 
 		dt_str = str(tx.transaction_date)[:16] if tx.transaction_date else "-"
-		proj_display = tx.project or "-"
+		
+		# Resolve project display name
+		proj_display = tx.project
+		if not proj_display:
+			# Fallback query from child basket projects table
+			sub_projs = frappe.get_all("Bir Basket Project", filters={"parent": tx.name}, fields=["project_name"])
+			if sub_projs:
+				proj_display = ", ".join(p.project_name for p in sub_projs if p.project_name)
+			else:
+				proj_display = "-"
 
 		rows_html += f"""
 		<tr style="background:#ffffff;">
@@ -250,9 +332,6 @@ def get_transaction_list_print_html(names=None):
 
 @frappe.whitelist()
 def export_selected_transactions_excel(names=None):
-	"""
-	Exports selected Bir Transaction records to a styled Excel file (.xlsx) and returns file URL.
-	"""
 	if isinstance(names, str):
 		try:
 			names = json.loads(names)
@@ -285,9 +364,6 @@ def export_selected_transactions_excel(names=None):
 
 @frappe.whitelist()
 def export_grouped_bank_statement_excel(import_batch=None, bank=None, projects=None):
-	"""
-	Exports grouped bank statement for selected projects to Excel (.xlsx) and returns file URL.
-	"""
 	excel_binary = build_grouped_bank_statement_excel(import_batch, bank, projects)
 	file_doc = frappe.get_doc({
 		"doctype": "File",
