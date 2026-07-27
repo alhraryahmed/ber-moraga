@@ -25,14 +25,21 @@ frappe.listview_settings['Bir Transaction'] = {
 							label: __('تصفية حسب المشاريع (متعدد التحديد - اختياري)'),
 							fieldname: 'projects',
 							fieldtype: 'MultiSelect',
-							options: [],
 							get_data: function(txt) {
-								return frappe.call({
+								var projects_list = [];
+								frappe.call({
 									method: 'bir_waqf.api.get_all_projects_for_multiselect',
-									args: { txt: txt || '' }
-								}).then(function(r) {
-									return r.message || [];
+									args: { txt: txt || '' },
+									async: false,
+									callback: function(r) {
+										if (r.message && Array.isArray(r.message)) {
+											projects_list = r.message.map(function(item) {
+												return item.label || item.value;
+											});
+										}
+									}
 								});
+								return projects_list;
 							},
 							description: __('اختر مشروعاً أو أكثر لترحيل تبرعاتها، أو اتركه فارغاً لترحيل كافة المشاريع')
 						}
