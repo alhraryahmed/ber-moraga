@@ -3,7 +3,7 @@ from bir_waqf.utils.file_processor import process_bir_file
 from bir_waqf.utils.bank_statement_processor import process_bank_statement_file
 from bir_waqf.utils.reconciliation import reconcile_bank_statement
 from bir_waqf.utils.excel_exporter import build_transactions_excel, build_grouped_bank_statement_excel
-from bir_waqf.utils.project_utils import get_or_create_project
+from bir_waqf.utils.project_utils import get_or_create_project, get_project_title
 
 @frappe.whitelist()
 def process_uploaded_file(file_url, batch_id=None):
@@ -21,7 +21,9 @@ def get_batch_transactions_by_bank(import_batch, bank=None, project=None):
 	if bank and str(bank).strip():
 		filters["bank_name"] = str(bank).strip()
 	if project and str(project).strip():
-		filters["project"] = str(project).strip()
+		p_val = str(project).strip()
+		p_id = frappe.db.get_value("Project", {"project_name": p_val}, "name") or p_val
+		filters["project"] = p_id
 
 	transactions = frappe.get_all(
 		"Bir Transaction",
@@ -31,11 +33,37 @@ def get_batch_transactions_by_bank(import_batch, bank=None, project=None):
 	return transactions
 
 @frappe.whitelist()
-def post_batch_transactions_to_entries(import_batch, bank=None, project=None):
+def post_batch_transactions_to_entries(import_batch, bank=None, projects=None):
 	"""
-	Creates or updates a Bir Bank Statement for the batch, bank & optional project,
+	Creates or updates a Bir Bank Statement for the batch, bank & optional multi-selected projects,
 	and posts matching Bir Transactions as statement entries.
 	"""
+	if isinstance(projects, str):
+		if projects.startswith("["):
+			try:
+				projects = json.loads(projects)
+			except Exception:
+				projects = [p.strip() for p in projects.split(",") if p.strip()]
+		else:
+			projects = [p.strip() for p in projects.split(",") if p.strip()]
+
+	if not projects:
+		projects = []
+
+	# Resolve all selected project IDs and titles into a set for fast lookup
+	resolved_projects = set()
+	for p in projects:
+		if not p or not str(p).strip():
+			continue
+		p_clean = str(p).strip()
+		resolved_projects.add(p_clean.lower())
+		p_title = frappe.db.get_value("Project", p_clean, "project_name")
+		if p_title:
+			resolved_projects.add(str(p_title).strip().lower())
+		p_id = frappe.db.get_value("Project", {"project_name": p_clean}, "name")
+		if p_id:
+			resolved_projects.add(str(p_id).strip().lower())
+
 	filters = {"import_batch": import_batch}
 	if bank and str(bank).strip():
 		filters["bank_name"] = str(bank).strip()
@@ -43,9 +71,8 @@ def post_batch_transactions_to_entries(import_batch, bank=None, project=None):
 	else:
 		stmt_title = f"كشف حساب عام - {import_batch}"
 
-	if project and str(project).strip():
-		clean_p = str(project).strip()
-		stmt_title += f" ({clean_p})"
+	if projects:
+		stmt_title += f" ({len(projects)} مشاريع)"
 
 	if frappe.db.exists("Bir Bank Statement", stmt_title):
 		doc = frappe.get_doc("Bir Bank Statement", stmt_title)
@@ -65,19 +92,27 @@ def post_batch_transactions_to_entries(import_batch, bank=None, project=None):
 
 	added_count = 0
 	for tx in txs:
-		if project and str(project).strip():
-			clean_p = str(project).strip()
-			if tx.is_basket:
-				has_proj = frappe.db.sql("""
-					SELECT name FROM `tabBir Basket Project`
-					WHERE parent = %s AND (project_name = %s OR LOWER(TRIM(project_name)) = LOWER(%s))
-					LIMIT 1
-				""", (tx.name, clean_p, clean_p))
-				if not has_proj:
-					continue
-			else:
-				if not tx.project or str(tx.project).strip().lower() != clean_p.lower():
-					continue
+		if resolved_projects:
+			match_found = False
+			# 1. Check single transaction project
+			if tx.project:
+				p_val = str(tx.project).strip().lower()
+				p_title = (frappe.db.get_value("Project", tx.project, "project_name") or "").strip().lower()
+				if p_val in resolved_projects or p_title in resolved_projects:
+					match_found = True
+
+			# 2. Check child basket projects
+			if not match_found:
+				sub_projs = frappe.get_all("Bir Basket Project", filters={"parent": tx.name}, fields=["project_name"])
+				for sub in sub_projs:
+					s_val = str(sub.project_name).strip().lower()
+					s_title = (frappe.db.get_value("Project", sub.project_name, "project_name") or "").strip().lower()
+					if s_val in resolved_projects or s_title in resolved_projects:
+						match_found = True
+						break
+
+			if not match_found:
+				continue
 
 		ref = tx.transfer_number or tx.transaction_id
 		if ref and ref not in existing_refs:
@@ -106,13 +141,16 @@ def post_batch_transactions_to_entries(import_batch, bank=None, project=None):
 def get_grouped_transactions_by_projects(import_batch, bank=None, projects=None):
 	"""
 	Fetches transactions filtered by import_batch, bank, and selected projects.
-	Groups donations under each selected project.
+	Groups donations under each selected project displaying Arabic titles.
 	"""
 	if isinstance(projects, str):
-		try:
-			projects = json.loads(projects)
-		except Exception:
-			projects = [projects]
+		if projects.startswith("["):
+			try:
+				projects = json.loads(projects)
+			except Exception:
+				projects = [p.strip() for p in projects.split(",") if p.strip()]
+		else:
+			projects = [p.strip() for p in projects.split(",") if p.strip()]
 
 	if not projects:
 		projects = []
@@ -125,18 +163,22 @@ def get_grouped_transactions_by_projects(import_batch, bank=None, projects=None)
 
 	grouped_data = []
 
-	for p_name in projects:
-		if not p_name or not str(p_name).strip():
+	for p_input in projects:
+		if not p_input or not str(p_input).strip():
 			continue
 
-		clean_p = str(p_name).strip()
+		clean_p = str(p_input).strip()
+		p_title = get_project_title(clean_p)
+		p_id = frappe.db.get_value("Project", {"project_name": clean_p}, "name") or clean_p
 
+		# Query matching single transactions
 		txs_single = frappe.get_all(
 			"Bir Transaction",
-			filters={**filters, "is_basket": 0, "project": clean_p},
+			filters={**filters, "is_basket": 0, "project": ["in", [clean_p, p_id, p_title]]},
 			fields=["name", "transaction_id", "transfer_number", "donor_name", "total_amount", "transaction_date", "reconciliation_status"]
 		)
 
+		# Query matching basket sub-transactions
 		txs_basket_rows = frappe.db.sql("""
 			SELECT t.name, t.transaction_id, t.transfer_number, t.donor_name, b.sub_amount as total_amount, t.transaction_date, t.reconciliation_status
 			FROM `tabBir Transaction` t
@@ -144,8 +186,8 @@ def get_grouped_transactions_by_projects(import_batch, bank=None, projects=None)
 			WHERE t.is_basket = 1
 			""" + (" AND t.import_batch = %s" if import_batch else "") + """
 			""" + (" AND t.bank_name = %s" if bank else "") + """
-			AND (b.project_name = %s OR LOWER(TRIM(b.project_name)) = LOWER(%s))
-		""", tuple([v for v in [import_batch, bank] if v] + [clean_p, clean_p]), as_dict=True) or []
+			AND (b.project_name IN (%s, %s, %s) OR LOWER(TRIM(b.project_name)) = LOWER(%s))
+		""", tuple([v for v in [import_batch, bank] if v] + [clean_p, p_id, p_title, clean_p]), as_dict=True) or []
 
 		items = txs_single + txs_basket_rows
 		total_sub = sum(float(i.total_amount or 0.0) for i in items)
@@ -165,7 +207,7 @@ def get_grouped_transactions_by_projects(import_batch, bank=None, projects=None)
 			})
 
 		grouped_data.append({
-			"project_name": clean_p,
+			"project_name": p_title,
 			"donations": donations,
 			"subtotal": total_sub
 		})
@@ -191,7 +233,7 @@ def toggle_transaction_reconciliation(transaction_id, is_reconciled):
 @frappe.whitelist()
 def get_transaction_list_print_html(names=None):
 	"""
-	Generates an HTML print report for a list of transactions (with project name & basket sub-rows).
+	Generates an HTML print report displaying full Arabic Project Titles.
 	"""
 	if isinstance(names, str):
 		try:
@@ -228,15 +270,23 @@ def get_transaction_list_print_html(names=None):
 
 		dt_str = str(tx.transaction_date)[:16] if tx.transaction_date else "-"
 		
-		# Resolve project display name
-		proj_display = tx.project
-		if not proj_display:
-			# Fallback query from child basket projects table
+		# Resolve Arabic Project Title
+		if tx.is_basket:
 			sub_projs = frappe.get_all("Bir Basket Project", filters={"parent": tx.name}, fields=["project_name"])
 			if sub_projs:
-				proj_display = ", ".join(p.project_name for p in sub_projs if p.project_name)
+				proj_titles = [get_project_title(p.project_name) for p in sub_projs if p.project_name]
+				proj_display = ", ".join(proj_titles)
 			else:
 				proj_display = "-"
+		else:
+			if tx.project:
+				proj_display = get_project_title(tx.project)
+			else:
+				sub_projs = frappe.get_all("Bir Basket Project", filters={"parent": tx.name}, fields=["project_name"])
+				if sub_projs:
+					proj_display = get_project_title(sub_projs[0].project_name)
+				else:
+					proj_display = "-"
 
 		rows_html += f"""
 		<tr style="background:#ffffff;">
@@ -256,11 +306,12 @@ def get_transaction_list_print_html(names=None):
 		if tx.is_basket:
 			tx_doc = frappe.get_doc("Bir Transaction", tx.name)
 			for s_idx, sub in enumerate(tx_doc.basket_projects or [], 1):
+				sub_title = get_project_title(sub.project_name)
 				rows_html += f"""
 				<tr style="background:#f8fafc;font-size:11px;">
 					<td style="text-align:center;color:#64748b;">└ {idx}.{s_idx}</td>
-					<td colspan="4" style="color:#2b6cb0;padding-right:20px;">↳ مشروع فرعي بالسلة: <b>{sub.project_name}</b></td>
-					<td>{sub.project_name}</td>
+					<td colspan="4" style="color:#2b6cb0;padding-right:20px;">↳ مشروع فرعي بالسلة: <b>{sub_title}</b></td>
+					<td>{sub_title}</td>
 					<td>-</td>
 					<td style="font-weight:bold;color:#166534;">{sub.sub_amount:,.2f} د.ل</td>
 					<td style="text-align:center;">-</td>

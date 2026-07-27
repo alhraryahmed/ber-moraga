@@ -1,6 +1,7 @@
 import frappe, openpyxl, io, json, base64
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
+from bir_waqf.utils.project_utils import get_project_title
 
 def apply_excel_styling(ws):
 	"""
@@ -28,7 +29,7 @@ def apply_excel_styling(ws):
 
 def build_transactions_excel(tx_list):
 	"""
-	Generates an openpyxl Workbook for selected transactions (with basket sub-rows).
+	Generates an openpyxl Workbook for selected transactions (with Arabic Project titles).
 	"""
 	wb = openpyxl.Workbook()
 	ws = wb.active
@@ -59,12 +60,23 @@ def build_transactions_excel(tx_list):
 		tx_doc = frappe.get_doc("Bir Transaction", tx.name)
 		is_basket = bool(tx_doc.is_basket)
 		tx_type = "سلة مشاريع" if is_basket else "معاملة مفردة"
-		proj_display = tx_doc.project
-		if not proj_display:
-			if tx_doc.basket_projects:
-				proj_display = ", ".join(p.project_name for p in tx_doc.basket_projects if p.project_name)
+
+		if is_basket:
+			sub_projs = tx_doc.basket_projects or []
+			if sub_projs:
+				proj_titles = [get_project_title(p.project_name) for p in sub_projs if p.project_name]
+				proj_display = ", ".join(proj_titles)
 			else:
 				proj_display = "-"
+		else:
+			if tx_doc.project:
+				proj_display = get_project_title(tx_doc.project)
+			else:
+				if tx_doc.basket_projects:
+					proj_display = get_project_title(tx_doc.basket_projects[0].project_name)
+				else:
+					proj_display = "-"
+
 		dt_str = str(tx_doc.transaction_date)[:16] if tx_doc.transaction_date else "-"
 
 		main_row = [
@@ -86,18 +98,19 @@ def build_transactions_excel(tx_list):
 		ws.row_dimensions[row_num].height = 22
 		row_num += 1
 
-		# If basket transaction, append indented sub-rows for projects
+		# If basket transaction, append indented sub-rows for projects with titles
 		if is_basket and tx_doc.basket_projects:
 			for sub_idx, sub in enumerate(tx_doc.basket_projects, 1):
+				sub_title = get_project_title(sub.project_name)
 				sub_row = [
 					f"  └ {idx}.{sub_idx}",
 					"-",
 					"-",
 					"-",
-					f"↳ فرعي: {sub.project_name}",
+					f"↳ فرعي: {sub_title}",
 					"-",
 					"-",
-					sub.project_name,
+					sub_title,
 					float(sub.sub_amount or 0.0),
 					"-",
 					"-",
@@ -122,6 +135,7 @@ def build_transactions_excel(tx_list):
 def build_grouped_bank_statement_excel(import_batch, bank, selected_projects):
 	"""
 	Generates an openpyxl Workbook grouped by Project for Quick Entry / Bank Reconciliation.
+	Displays Arabic Project Titles.
 	"""
 	wb = openpyxl.Workbook()
 	ws = wb.active
@@ -158,7 +172,6 @@ def build_grouped_bank_statement_excel(import_batch, bank, selected_projects):
 		cell.font = header_font
 		cell.alignment = Alignment(horizontal="center", vertical="center")
 
-	# Fetch data grouped by project
 	filters = {}
 	if import_batch and str(import_batch).strip():
 		filters["import_batch"] = str(import_batch).strip()
@@ -166,26 +179,31 @@ def build_grouped_bank_statement_excel(import_batch, bank, selected_projects):
 		filters["bank_name"] = str(bank).strip()
 
 	if isinstance(selected_projects, str):
-		try:
-			selected_projects = json.loads(selected_projects)
-		except Exception:
-			selected_projects = [selected_projects]
+		if selected_projects.startswith("["):
+			try:
+				selected_projects = json.loads(selected_projects)
+			except Exception:
+				selected_projects = [p.strip() for p in selected_projects.split(",") if p.strip()]
+		else:
+			selected_projects = [p.strip() for p in selected_projects.split(",") if p.strip()]
 
 	if not selected_projects:
 		selected_projects = []
 
 	cur_row = 4
 
-	for p_name in selected_projects:
-		if not p_name or not str(p_name).strip():
+	for p_input in selected_projects:
+		if not p_input or not str(p_input).strip():
 			continue
 
-		clean_p = str(p_name).strip()
+		clean_p = str(p_input).strip()
+		p_title = get_project_title(clean_p)
+		p_id = frappe.db.get_value("Project", {"project_name": clean_p}, "name") or clean_p
 
-		# Single transactions matching project OR basket transactions containing child project
+		# Query matching single and basket transactions
 		txs_single = frappe.get_all(
 			"Bir Transaction",
-			filters={**filters, "is_basket": 0, "project": clean_p},
+			filters={**filters, "is_basket": 0, "project": ["in", [clean_p, p_id, p_title]]},
 			fields=["name", "transaction_id", "transfer_number", "donor_name", "total_amount", "transaction_date", "reconciliation_status"]
 		)
 
@@ -196,15 +214,15 @@ def build_grouped_bank_statement_excel(import_batch, bank, selected_projects):
 			WHERE t.is_basket = 1
 			""" + (" AND t.import_batch = %s" if import_batch else "") + """
 			""" + (" AND t.bank_name = %s" if bank else "") + """
-			AND (b.project_name = %s OR LOWER(TRIM(b.project_name)) = LOWER(%s))
-		""", tuple([v for v in [import_batch, bank] if v] + [clean_p, clean_p]), as_dict=True) or []
+			AND (b.project_name IN (%s, %s, %s) OR LOWER(TRIM(b.project_name)) = LOWER(%s))
+		""", tuple([v for v in [import_batch, bank] if v] + [clean_p, p_id, p_title, clean_p]), as_dict=True) or []
 
 		all_project_txs = txs_single + txs_basket_rows
 
-		# Group Section Header
+		# Group Section Header with Arabic Title
 		ws.merge_cells(start_row=cur_row, start_column=1, end_row=cur_row, end_column=7)
 		header_cell = ws.cell(row=cur_row, column=1)
-		header_cell.value = f"📌 مشروع: {clean_p} (عدد التبرعات: {len(all_project_txs)})"
+		header_cell.value = f"📌 مشروع: {p_title} (عدد التبرعات: {len(all_project_txs)})"
 		header_cell.fill = proj_header_fill
 		header_cell.font = proj_header_font
 		header_cell.alignment = Alignment(horizontal="right", vertical="center")
@@ -235,7 +253,7 @@ def build_grouped_bank_statement_excel(import_batch, bank, selected_projects):
 
 		# Subtotal Row
 		ws.merge_cells(start_row=cur_row, start_column=1, end_row=cur_row, end_column=4)
-		ws.cell(row=cur_row, column=1).value = f"إجمالي تبرعات مشروع ({clean_p}):"
+		ws.cell(row=cur_row, column=1).value = f"إجمالي تبرعات مشروع ({p_title}):"
 		ws.cell(row=cur_row, column=1).fill = subtotal_fill
 		ws.cell(row=cur_row, column=1).font = subtotal_font
 		ws.cell(row=cur_row, column=1).alignment = Alignment(horizontal="left", vertical="center")
@@ -252,7 +270,6 @@ def build_grouped_bank_statement_excel(import_batch, bank, selected_projects):
 		ws.row_dimensions[cur_row].height = 22
 		cur_row += 1
 
-		# Empty spacing row
 		ws.append([])
 		cur_row += 1
 
