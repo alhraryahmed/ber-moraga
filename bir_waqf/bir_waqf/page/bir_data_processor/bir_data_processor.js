@@ -135,7 +135,7 @@ frappe.pages['bir_data_processor'].on_page_load = function(wrapper) {
 
 	load_stats();
 
-	// Initialize Controls: Batch, Bank, Projects (MultiSelect with get_data callback)
+	// Initialize Controls: Batch, Bank, Projects (MultiSelect calling get_all_projects_for_multiselect)
 	var field_batch = frappe.ui.form.make_control({
 		df: {
 			fieldtype: 'Link',
@@ -167,20 +167,10 @@ frappe.pages['bir_data_processor'].on_page_load = function(wrapper) {
 			placeholder: 'اختر مشروعات...',
 			get_data: function(txt) {
 				return frappe.call({
-					method: 'frappe.desk.search.search_link',
-					args: {
-						doctype: 'Project',
-						txt: txt || '',
-						page_length: 50
-					}
+					method: 'bir_waqf.api.get_all_projects_for_multiselect',
+					args: { txt: txt || '' }
 				}).then(function(r) {
-					return (r.results || []).map(function(item) {
-						var label_str = item.description ? (item.description + ' (' + item.value + ')') : item.value;
-						return {
-							value: item.value,
-							label: label_str
-						};
-					});
+					return r.message || [];
 				});
 			}
 		},

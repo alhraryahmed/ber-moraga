@@ -13,6 +13,35 @@ def process_uploaded_file(file_url, batch_id=None):
 	return res
 
 @frappe.whitelist()
+def get_all_projects_for_multiselect(txt=None):
+	"""
+	Returns list of all active Project documents formatted for MultiSelect controls.
+	"""
+	filters = {}
+	if txt and str(txt).strip():
+		clean_txt = str(txt).strip()
+		filters = {"project_name": ["like", f"%{clean_txt}%"]}
+
+	projects = frappe.get_all(
+		"Project",
+		filters=filters,
+		fields=["name", "project_name"],
+		order_by="project_name asc",
+		limit_page_length=200
+	)
+
+	results = []
+	for p in projects:
+		title = p.project_name or p.name
+		results.append({
+			"value": p.name,
+			"label": f"{title} ({p.name})" if p.project_name else p.name,
+			"description": title
+		})
+
+	return results
+
+@frappe.whitelist()
 def get_batch_transactions_by_bank(import_batch, bank=None, project=None):
 	"""
 	Fetches Bir Transactions filtered by import_batch, bank, and optional project.

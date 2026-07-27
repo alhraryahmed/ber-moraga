@@ -26,20 +26,10 @@ frappe.listview_settings['Bir Transaction'] = {
 						fieldtype: 'MultiSelect',
 						get_data: function(txt) {
 							return frappe.call({
-								method: 'frappe.desk.search.search_link',
-								args: {
-									doctype: 'Project',
-									txt: txt || '',
-									page_length: 50
-								}
+								method: 'bir_waqf.api.get_all_projects_for_multiselect',
+								args: { txt: txt || '' }
 							}).then(function(r) {
-								return (r.results || []).map(function(item) {
-									var label_str = item.description ? (item.description + ' (' + item.value + ')') : item.value;
-									return {
-										value: item.value,
-										label: label_str
-									};
-								});
+								return r.message || [];
 							});
 						},
 						description: __('اختر مشروعاً أو أكثر لترحيل تبرعاتها، أو اتركه فارغاً لترحيل كافة المشاريع')
