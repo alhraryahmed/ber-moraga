@@ -135,7 +135,7 @@ frappe.pages['bir_data_processor'].on_page_load = function(wrapper) {
 
 	load_stats();
 
-	// Initialize Controls: Batch, Bank, Projects (MultiSelect calling get_all_projects_for_multiselect)
+	// Initialize Controls: Batch, Bank, Projects (MultiSelect with empty options array)
 	var field_batch = frappe.ui.form.make_control({
 		df: {
 			fieldtype: 'Link',
@@ -164,6 +164,7 @@ frappe.pages['bir_data_processor'].on_page_load = function(wrapper) {
 		df: {
 			fieldtype: 'MultiSelect',
 			fieldname: 'projects_filter',
+			options: [],
 			placeholder: 'اختر مشروعات...',
 			get_data: function(txt) {
 				return frappe.call({

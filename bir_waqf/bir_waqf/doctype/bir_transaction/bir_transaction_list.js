@@ -2,60 +2,66 @@ frappe.listview_settings['Bir Transaction'] = {
 	onload: function(listview) {
 		// Post to Statement Entries Dialog Button (By Import Batch, Bank & MultiSelect Projects)
 		listview.page.add_inner_button(__('ترحيل الدفعة والمصرف للمطابقة'), function() {
-			var d = new frappe.ui.Dialog({
-				title: __('ترحيل معاملات (الدفعة + المصرف + المشاريع) إلى كشف الحساب'),
-				fields: [
-					{
-						label: __('اختر دفعة الاستيراد (Import Batch)'),
-						fieldname: 'import_batch',
-						fieldtype: 'Link',
-						options: 'Bir Import Batch',
-						reqd: 1,
-						description: __('اختر دفعة الاستيراد لترحيل معاملاتها')
-					},
-					{
-						label: __('تصفية حسب المصرف'),
-						fieldname: 'bank',
-						fieldtype: 'Link',
-						options: 'Bank',
-						description: __('اختر المصرف لترحيل معاملات هذا المصرف فقط داخل كشف حسابه')
-					},
-					{
-						label: __('تصفية حسب المشاريع (متعدد التحديد - اختياري)'),
-						fieldname: 'projects',
-						fieldtype: 'MultiSelect',
-						get_data: function(txt) {
-							return frappe.call({
-								method: 'bir_waqf.api.get_all_projects_for_multiselect',
-								args: { txt: txt || '' }
-							}).then(function(r) {
-								return r.message || [];
-							});
+			try {
+				var d = new frappe.ui.Dialog({
+					title: __('ترحيل معاملات (الدفعة + المصرف + المشاريع) إلى كشف الحساب'),
+					fields: [
+						{
+							label: __('اختر دفعة الاستيراد (Import Batch)'),
+							fieldname: 'import_batch',
+							fieldtype: 'Link',
+							options: 'Bir Import Batch',
+							reqd: 1,
+							description: __('اختر دفعة الاستيراد لترحيل معاملاتها')
 						},
-						description: __('اختر مشروعاً أو أكثر لترحيل تبرعاتها، أو اتركه فارغاً لترحيل كافة المشاريع')
-					}
-				],
-				primary_action_label: __('إنشاء/ترحيل الآن إلى كشف الحساب'),
-				primary_action: function(values) {
-					d.hide();
-					frappe.show_alert({message: __('جاري ترحيل معاملات المصرف والدفعة والمشاريع إلى كشف الحساب...'), indicator: 'blue'});
-					frappe.call({
-						method: 'bir_waqf.api.post_batch_transactions_to_entries',
-						args: {
-							import_batch: values.import_batch,
-							bank: values.bank,
-							projects: values.projects
+						{
+							label: __('تصفية حسب المصرف'),
+							fieldname: 'bank',
+							fieldtype: 'Link',
+							options: 'Bank',
+							description: __('اختر المصرف لترحيل معاملات هذا المصرف فقط داخل كشف حسابه')
 						},
-						callback: function(r) {
-							if (r.message && r.message.status === 'success') {
-								frappe.msgprint(__('تم إنشاء/تحديث كشف الحساب [{0}] وترحيل {1} معاملة بنجاح.', [r.message.statement_name, r.message.added_count]));
-								frappe.set_route('Form', 'Bir Bank Statement', r.message.statement_name);
-							}
+						{
+							label: __('تصفية حسب المشاريع (متعدد التحديد - اختياري)'),
+							fieldname: 'projects',
+							fieldtype: 'MultiSelect',
+							options: [],
+							get_data: function(txt) {
+								return frappe.call({
+									method: 'bir_waqf.api.get_all_projects_for_multiselect',
+									args: { txt: txt || '' }
+								}).then(function(r) {
+									return r.message || [];
+								});
+							},
+							description: __('اختر مشروعاً أو أكثر لترحيل تبرعاتها، أو اتركه فارغاً لترحيل كافة المشاريع')
 						}
-					});
-				}
-			});
-			d.show();
+					],
+					primary_action_label: __('إنشاء/ترحيل الآن إلى كشف الحساب'),
+					primary_action: function(values) {
+						d.hide();
+						frappe.show_alert({message: __('جاري ترحيل معاملات المصرف والدفعة والمشاريع إلى كشف الحساب...'), indicator: 'blue'});
+						frappe.call({
+							method: 'bir_waqf.api.post_batch_transactions_to_entries',
+							args: {
+								import_batch: values.import_batch,
+								bank: values.bank,
+								projects: values.projects
+							},
+							callback: function(r) {
+								if (r.message && r.message.status === 'success') {
+									frappe.msgprint(__('تم إنشاء/تحديث كشف الحساب [{0}] وترحيل {1} معاملة بنجاح.', [r.message.statement_name, r.message.added_count]));
+									frappe.set_route('Form', 'Bir Bank Statement', r.message.statement_name);
+								}
+							}
+						});
+					}
+				});
+				d.show();
+			} catch (err) {
+				console.error("Error opening dialog:", err);
+				frappe.msgprint(__('حدث خطأ أثناء فتح النافذة: ') + err.message);
+			}
 		}).addClass('btn-primary');
 
 		// Assign Bank Button (تضمين المصرف للمعاملات المحددة)
