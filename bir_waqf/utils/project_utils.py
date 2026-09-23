@@ -60,33 +60,47 @@ def get_project_title(project_name_or_id):
 
 def resolve_project_tokens(p_str):
 	"""
-	Given any project input string (e.g. 'PROJ-0001', 'مشروع كذا', or 'مشروع كذا (PROJ-0001)'),
-	returns set of matching project IDs and titles (in lowercase) for database matching.
+	Given any project input string (e.g. 'PROJ-0001', 'مشروع كذا', or '(PROJ-0001) مشروع كذا'),
+	returns set of matching project IDs and titles (in original, lowercase, and uppercase) for database matching.
 	"""
 	tokens = set()
 	if not p_str or not str(p_str).strip():
 		return tokens
 
 	text = str(p_str).strip()
+	tokens.add(text)
 	tokens.add(text.lower())
+	tokens.add(text.upper())
 
-	match_id = re.search(r'\((PROJ-[0-9]+)\)', text)
-	if match_id:
-		proj_id = match_id.group(1).strip()
-		tokens.add(proj_id.lower())
-		title = frappe.db.get_value("Project", proj_id, "project_name")
+	# Extract PROJ-XXXX if present anywhere in text
+	match_ids = re.findall(r'PROJ-[0-9]+', text, re.IGNORECASE)
+	for proj_id in match_ids:
+		pid = proj_id.strip()
+		tokens.add(pid)
+		tokens.add(pid.lower())
+		tokens.add(pid.upper())
+		title = frappe.db.get_value("Project", pid, "project_name")
 		if title:
-			tokens.add(str(title).strip().lower())
+			t = str(title).strip()
+			tokens.add(t)
+			tokens.add(t.lower())
+			tokens.add(t.upper())
 
-	raw_title = text.split('(')[0].strip()
-	if raw_title:
-		tokens.add(raw_title.lower())
-		p_id = frappe.db.get_value("Project", {"project_name": raw_title}, "name")
-		if p_id:
-			tokens.add(str(p_id).strip().lower())
+	# Try exact lookup in Project DocType by name or project_name
+	p_doc = frappe.db.sql("""
+		SELECT name, project_name FROM `tabProject`
+		WHERE LOWER(TRIM(name)) = LOWER(%s) OR LOWER(TRIM(project_name)) = LOWER(%s)
+		LIMIT 1
+	""", (text, text), as_dict=True)
 
-	p_title = frappe.db.get_value("Project", text, "project_name")
-	if p_title:
-		tokens.add(str(p_title).strip().lower())
+	if p_doc:
+		pid = p_doc[0].name
+		pname = p_doc[0].project_name or pid
+		tokens.add(pid)
+		tokens.add(pid.lower())
+		tokens.add(pid.upper())
+		tokens.add(pname)
+		tokens.add(pname.lower())
+		tokens.add(pname.upper())
 
 	return tokens

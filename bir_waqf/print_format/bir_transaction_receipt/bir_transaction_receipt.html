@@ -1,0 +1,326 @@
+<div class="bir-print">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Amiri:ital,wght@0,400;0,700;1,400&family=Tajawal:wght@300;400;500;700;800&display=swap');
+
+.bir-print {
+  --green-deep:   #0B3D2E;
+  --green-mid:    #145C43;
+  --green-soft:   #EAF2EE;
+  --gold:         #C6A15B;
+  --gold-light:   #E8D5A3;
+  --cream:        #FAF7F0;
+  --ink:          #1C2B24;
+  --ink-soft:     #5C6B63;
+  --line:         #D9CFB8;
+
+  direction: rtl;
+  font-family: 'Tajawal', sans-serif;
+  color: var(--ink);
+  background: var(--cream);
+  width: 100%;
+  max-width: 190mm;
+  margin: 0 auto;
+  padding: 15px;
+  box-sizing: border-box;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+.bir-print * { box-sizing: border-box; }
+
+.bir-corner {
+  position: absolute;
+  width: 34px;
+  height: 34px;
+  opacity: 0.9;
+}
+.bir-corner svg { width: 100%; height: 100%; display: block; }
+.bir-corner.tl { top: 10px; left: 10px; }
+.bir-corner.tr { top: 10px; right: 10px; transform: scaleX(-1); }
+
+.bir-header {
+  position: relative;
+  background: linear-gradient(135deg, var(--green-deep) 0%, var(--green-mid) 100%);
+  border-radius: 14px 14px 0 0;
+  padding: 26px 34px 22px;
+  color: #fff;
+  overflow: hidden;
+}
+.bir-header::after{
+  content:"";
+  position:absolute; inset:0;
+  background-image: repeating-linear-gradient(45deg, rgba(198,161,91,0.06) 0 2px, transparent 2px 14px);
+  pointer-events:none;
+}
+.bir-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  position: relative;
+  z-index: 1;
+}
+.bir-brand { display: flex; align-items: center; gap: 12px; }
+.bir-logo {
+  width: 54px; height: 54px;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(232,213,163,0.5);
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.bir-logo img { width: 100%; height: 100%; object-fit: contain; }
+.bir-brand-text .bir-title {
+  font-family: 'Amiri', serif;
+  font-weight: 700;
+  font-size: 21px;
+  color: var(--gold-light);
+  line-height: 1.3;
+}
+.bir-brand-text .bir-sub {
+  font-size: 11.5px;
+  color: rgba(255,255,255,0.75);
+  margin-top: 2px;
+  letter-spacing: .3px;
+}
+.bir-doc-tag {
+  text-align: left;
+  font-size: 11px;
+  color: rgba(255,255,255,0.65);
+}
+.bir-doc-tag .bir-doc-no {
+  font-family: 'Tajawal', sans-serif;
+  font-weight: 800;
+  font-size: 16px;
+  color: #fff;
+  direction: ltr;
+  display: block;
+  margin-top: 3px;
+}
+.bir-gold-rule {
+  height: 3px;
+  background: linear-gradient(90deg, var(--gold) 0%, var(--gold-light) 50%, var(--gold) 100%);
+}
+
+.bir-doctitle {
+  background: var(--green-soft);
+  border-bottom: 1px solid var(--line);
+  padding: 14px 34px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.bir-doctitle h1 {
+  font-family: 'Amiri', serif;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--green-deep);
+  margin: 0;
+}
+.bir-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 14px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  border: 1px solid transparent;
+}
+.bir-badge.ok      { background:#E4F3EA; color:#1C6B3F; border-color:#BFE3CC; }
+.bir-badge.pending { background:#FCF3DC; color:#8A6416; border-color:#F0DFA9; }
+.bir-badge.failed  { background:#FBE7E7; color:#A03A3A; border-color:#F1C7C7; }
+.bir-badge .dot { width:7px; height:7px; border-radius:50%; background:currentColor; }
+
+.bir-body { background:#fff; padding: 26px 34px 18px; position: relative; }
+
+.bir-amount-block{
+  text-align:center;
+  padding: 10px 0 22px;
+  border-bottom: 1px dashed var(--line);
+  margin-bottom: 22px;
+}
+.bir-amount-label{ font-size:12px; color:var(--ink-soft); letter-spacing:.3px; }
+.bir-amount-value{
+  font-family:'Amiri', serif;
+  font-weight:700;
+  font-size:34px;
+  color: var(--green-deep);
+  margin-top: 4px;
+}
+.bir-amount-value .cur{ font-size:16px; color: var(--gold); font-family:'Tajawal',sans-serif; font-weight:700; margin-right:4px;}
+
+.bir-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 28px;
+}
+.bir-field {
+  padding: 11px 0;
+  border-bottom: 1px solid #F0ECE0;
+  display:flex;
+  align-items:baseline;
+  justify-content:space-between;
+  gap: 10px;
+}
+.bir-field .k { font-size: 12px; color: var(--ink-soft); white-space:nowrap; }
+.bir-field .v { font-size: 13.5px; font-weight: 600; color: var(--ink); text-align:left; direction:ltr; unicode-bidi: plaintext; }
+
+.bir-basket-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 15px;
+}
+.bir-basket-table th {
+  background: var(--green-soft);
+  color: var(--green-deep);
+  font-weight: 700;
+  padding: 8px 12px;
+  text-align: right;
+  border-bottom: 2px solid var(--gold);
+  font-size: 12px;
+}
+.bir-basket-table td {
+  padding: 8px 12px;
+  border-bottom: 1px solid #F0ECE0;
+  font-size: 12px;
+}
+
+.bir-flags{
+  margin-top: 18px;
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+}
+.bir-flag{
+  font-size:11px;
+  font-weight:700;
+  padding:5px 12px;
+  border-radius:8px;
+  background:#FBE7E7;
+  color:#A03A3A;
+  border:1px solid #F1C7C7;
+}
+
+.bir-footer {
+  margin-top: 26px;
+  padding: 16px 34px 22px;
+  border-top: 1px solid var(--line);
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap: 16px;
+}
+.bir-verse {
+  font-family:'Amiri', serif;
+  font-style: italic;
+  font-size: 12.5px;
+  color: var(--green-mid);
+}
+.bir-footer-meta {
+  font-size: 10px;
+  color: var(--ink-soft);
+  text-align:left;
+  line-height:1.6;
+}
+
+@media print {
+  .bir-print { max-width: 100%; }
+  .bir-header, .bir-doctitle, .bir-body, .bir-footer { padding-left: 16mm; padding-right: 16mm; }
+}
+</style>
+
+<div class="bir-header">
+  <div class="bir-corner tl"><svg viewBox="0 0 40 40"><path d="M0 0 L40 0 L40 6 L6 6 L6 40 L0 40 Z" fill="#C6A15B"/><circle cx="6" cy="6" r="3.2" fill="none" stroke="#E8D5A3" stroke-width="1.2"/></svg></div>
+  <div class="bir-corner tr"><svg viewBox="0 0 40 40"><path d="M0 0 L40 0 L40 6 L6 6 L6 40 L0 40 Z" fill="#C6A15B"/><circle cx="6" cy="6" r="3.2" fill="none" stroke="#E8D5A3" stroke-width="1.2"/></svg></div>
+
+  <div class="bir-header-row">
+    <div class="bir-brand">
+      <div class="bir-logo">
+        <img src="/assets/bir_waqf/images/albir-logo.png" onerror="this.style.display='none'" alt="منصة البر الوقفية">
+      </div>
+      <div class="bir-brand-text">
+        <div class="bir-title">منصة البر الوقفية</div>
+        <div class="bir-sub">الهيئة العامة للأوقاف والشؤون الإسلامية</div>
+      </div>
+    </div>
+    <div class="bir-doc-tag">
+      رقم المعاملة
+      <span class="bir-doc-no">{{ doc.transaction_id or doc.name }}</span>
+    </div>
+  </div>
+</div>
+<div class="bir-gold-rule"></div>
+
+<div class="bir-doctitle">
+  <h1>إيصال معاملة بر</h1>
+  {%- set status = doc.transaction_status or "مكتمل" -%}
+  {%- if status in ["مكتمل", "Completed", "Success"] -%}
+    <span class="bir-badge ok"><span class="dot"></span>{{ status }}</span>
+  {%- elif status in ["معلق", "Pending", "قيد المعالجة"] -%}
+    <span class="bir-badge pending"><span class="dot"></span>{{ status }}</span>
+  {%- else -%}
+    <span class="bir-badge failed"><span class="dot"></span>{{ status or "غير محدد" }}</span>
+  {%- endif -%}
+</div>
+
+<div class="bir-body">
+
+  <div class="bir-amount-block">
+    <div class="bir-amount-label">القيمة الإجمالية للمعاملة</div>
+    <div class="bir-amount-value">{{ "%.2f"|format(doc.total_amount or 0) }}<span class="cur">د.ل</span></div>
+  </div>
+
+  <div class="bir-grid">
+    <div class="bir-field"><span class="k">رقم طلب المساهمة</span><span class="v">{{ doc.contribution_request_id or "—" }}</span></div>
+    <div class="bir-field"><span class="k">رقم الحوالة / الصك</span><span class="v">{{ doc.transfer_number or "—" }}</span></div>
+
+    <div class="bir-field"><span class="k">المصرف</span><span class="v" style="direction:rtl;">{{ doc.bank_name or "—" }}</span></div>
+    <div class="bir-field"><span class="k">دفعة الاستيراد</span><span class="v">{{ doc.import_batch or "—" }}</span></div>
+
+    <div class="bir-field"><span class="k">المستخدم / المتبرع</span><span class="v" style="direction:rtl;">{{ doc.donor_name or "—" }}</span></div>
+    <div class="bir-field"><span class="k">تاريخ المعاملة</span><span class="v">{{ frappe.utils.format_datetime(doc.transaction_date) if doc.transaction_date else "—" }}</span></div>
+  </div>
+
+  {%- if doc.is_basket and doc.basket_projects %}
+  <div style="margin-top: 20px;">
+    <h4 style="font-size: 14px; font-weight: 700; color: var(--green-deep); margin-bottom: 8px;">مشاريع السلة الفرعية:</h4>
+    <table class="bir-basket-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>اسم المشروع الفرعي</th>
+          <th style="text-align: left;">المبلغ الفرعي</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in doc.basket_projects %}
+        <tr>
+          <td>{{ loop.index }}</td>
+          <td>{{ p.project_name }}</td>
+          <td style="text-align: left; font-weight: 700;">{{ "%.2f"|format(p.sub_amount or 0) }} د.ل</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {%- endif %}
+
+  {%- if doc.is_basket or doc.has_exception %}
+  <div class="bir-flags">
+    {%- if doc.is_basket %}<span class="bir-flag" style="background:#EAF2EE;color:#1C6B3F;border-color:#BFE3CC;">معاملة سلة ({{ doc.basket_items_count or 0 }} مشاريع)</span>{%- endif %}
+    {%- if doc.has_exception %}<span class="bir-flag">توجد استثناءات: {{ doc.exception_reason or "" }}</span>{%- endif %}
+  </div>
+  {%- endif %}
+
+</div>
+
+<div class="bir-footer">
+  <div class="bir-verse">﴿ لَن تَنَالُوا الْبِرَّ حَتَّىٰ تُنفِقُوا مِمَّا تُحِبُّونَ ﴾</div>
+  <div class="bir-footer-meta">
+    تم الإصدار عبر منصة البر الوقفية — albir.ly<br>
+    {{ frappe.utils.format_datetime(frappe.utils.now()) }}
+  </div>
+</div>
+
+</div>

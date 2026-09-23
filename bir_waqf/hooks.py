@@ -6,6 +6,7 @@ app_email = "info@waqf.ly"
 app_license = "mit"
 
 app_include_css = "/assets/bir_waqf/css/bir_waqf.css"
+app_include_js = "/assets/bir_waqf/js/bir_waqf.js"
 
 doc_events = {
 	"Bir Bank Statement": {

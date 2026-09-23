@@ -1,0 +1,43 @@
+
+.bir-waqf-header {
+	background: linear-gradient(135deg, #0A4D2E 0%, #12633d 100%);
+	color: #ffffff;
+	padding: 24px;
+	border-radius: 12px;
+	box-shadow: 0 4px 15px rgba(10, 77, 46, 0.2);
+	margin-bottom: 24px;
+	border-bottom: 3px solid #D4AF37;
+}
+.bir-waqf-title {
+	font-family: 'Tajawal', sans-serif;
+	font-size: 24px;
+	font-weight: 700;
+	color: #D4AF37;
+	margin: 0 0 8px 0;
+}
+.bir-card {
+	background: #ffffff;
+	border-radius: 10px;
+	padding: 20px;
+	border: 1px solid #e2e8f0;
+	box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+	transition: all 0.3s ease;
+}
+.bir-card:hover {
+	transform: translateY(-2px);
+	box-shadow: 0 4px 12px rgba(10, 77, 46, 0.1);
+}
+.bir-stat-num {
+	font-size: 28px;
+	font-weight: 800;
+	color: #0A4D2E;
+}
+.bir-btn-primary {
+	background-color: #0A4D2E !important;
+	color: #D4AF37 !important;
+	border: 1px solid #D4AF37 !important;
+	font-weight: bold;
+}
+.bir-btn-primary:hover {
+	background-color: #12633d !important;
+}

@@ -193,10 +193,104 @@ def post_batch_transactions_to_entries(import_batch, bank=None, projects=None):
 	}
 
 @frappe.whitelist()
+def reconcile_all_statement_entries(statement_name):
+	"""
+	Reconciles ALL entries in the given Bir Bank Statement document.
+	Sets is_reconciled = 1 for all entries and updates all matching Bir Transactions to 'مطابق آليًا'.
+	"""
+	if not statement_name or not frappe.db.exists("Bir Bank Statement", statement_name):
+		return {"status": "error", "message": "Statement document not found"}
+
+	doc = frappe.get_doc("Bir Bank Statement", statement_name)
+	reconciled_count = 0
+
+	for entry in doc.entries:
+		entry.is_reconciled = 1
+		ref = entry.reference_number
+		if ref:
+			tx_name = frappe.db.get_value("Bir Transaction", {"transaction_id": ref}, "name") or \
+					  frappe.db.get_value("Bir Transaction", {"transfer_number": ref}, "name") or ref
+			if frappe.db.exists("Bir Transaction", tx_name):
+				frappe.db.set_value("Bir Transaction", tx_name, {
+					"reconciliation_status": "مطابق آليًا",
+					"has_exception": 0
+				})
+				reconciled_count += 1
+
+	doc.flags.ignore_permissions = True
+	doc.save()
+	frappe.db.commit()
+
+	return {
+		"status": "success",
+		"message": f"تم تشغيل المطابقة الآلية وتفعيل كافة المعاملات كمطابقة بنجاح ({reconciled_count} معاملة).",
+		"reconciled_count": reconciled_count
+	}
+
+@frappe.whitelist()
+def get_all_linked_projects(import_batch, bank=None):
+	"""
+	Returns all project titles associated with transactions for the given import_batch and optional bank.
+	Includes projects from single transactions and basket transactions.
+	"""
+	if not import_batch or not str(import_batch).strip():
+		return []
+
+	clean_batch = str(import_batch).strip()
+	clean_bank = str(bank).strip() if bank and str(bank).strip() else None
+
+	# 1. Single transactions query
+	sql_single = """
+		SELECT DISTINCT project
+		FROM `tabBir Transaction`
+		WHERE is_basket = 0
+		AND import_batch = %s
+		AND project IS NOT NULL AND TRIM(project) != ''
+	"""
+	params_single = [clean_batch]
+	if clean_bank:
+		sql_single += " AND (TRIM(bank_name) = %s OR TRIM(bank_name) LIKE %s)"
+		params_single.extend([clean_bank, f"%{clean_bank}%"])
+
+	single_projs = frappe.db.sql(sql_single, tuple(params_single), as_dict=True) or []
+
+	# 2. Basket transactions query
+	sql_basket = """
+		SELECT DISTINCT b.project_name
+		FROM `tabBir Transaction` t
+		INNER JOIN `tabBir Basket Project` b ON b.parent = t.name
+		WHERE t.is_basket = 1
+		AND t.import_batch = %s
+		AND b.project_name IS NOT NULL AND TRIM(b.project_name) != ''
+	"""
+	params_basket = [clean_batch]
+	if clean_bank:
+		sql_basket += " AND (TRIM(t.bank_name) = %s OR TRIM(t.bank_name) LIKE %s)"
+		params_basket.extend([clean_bank, f"%{clean_bank}%"])
+
+	basket_projs = frappe.db.sql(sql_basket, tuple(params_basket), as_dict=True) or []
+
+	project_names = set()
+	for s in single_projs:
+		p = s.get("project")
+		if p and str(p).strip():
+			p_name = get_project_title(p) or str(p).strip()
+			project_names.add(p_name)
+
+	for b in basket_projs:
+		p = b.get("project_name")
+		if p and str(p).strip():
+			p_name = get_project_title(p) or str(p).strip()
+			project_names.add(p_name)
+
+	return sorted(list(project_names))
+
+@frappe.whitelist()
 def get_grouped_transactions_by_projects(import_batch, bank=None, projects=None):
 	"""
 	Fetches transactions filtered by import_batch, bank, and selected projects.
 	Groups donations under each selected project displaying Arabic titles.
+	If projects is empty, automatically fetches all linked projects.
 	"""
 	if isinstance(projects, str):
 		if projects.startswith("["):
@@ -207,14 +301,14 @@ def get_grouped_transactions_by_projects(import_batch, bank=None, projects=None)
 		else:
 			projects = [p.strip() for p in projects.split(",") if p.strip()]
 
-	if not projects:
-		projects = []
+	if not projects or len(projects) == 0:
+		projects = get_all_linked_projects(import_batch, bank)
 
-	filters = {}
-	if import_batch and str(import_batch).strip():
-		filters["import_batch"] = str(import_batch).strip()
-	if bank and str(bank).strip():
-		filters["bank_name"] = str(bank).strip()
+	if not projects:
+		return []
+
+	clean_batch = str(import_batch).strip() if import_batch else ""
+	clean_bank = str(bank).strip() if bank and str(bank).strip() else None
 
 	grouped_data = []
 
@@ -227,32 +321,68 @@ def get_grouped_transactions_by_projects(import_batch, bank=None, projects=None)
 		tokens = list(resolve_project_tokens(clean_p))
 
 		if not tokens:
-			tokens = [clean_p.lower()]
+			tokens = [clean_p]
+
+		# 1. Single Transactions matching
+		tx_filters = {"is_basket": 0, "project": ["in", tokens]}
+		if clean_batch:
+			tx_filters["import_batch"] = clean_batch
+		if clean_bank:
+			tx_filters["bank_name"] = clean_bank
 
 		txs_single = frappe.get_all(
 			"Bir Transaction",
-			filters={**filters, "is_basket": 0, "project": ["in", tokens]},
+			filters=tx_filters,
 			fields=["name", "transaction_id", "transfer_number", "donor_name", "total_amount", "transaction_date", "reconciliation_status"]
 		)
 
-		placeholders = ", ".join(["%s"] * len(tokens))
+		# 2. Basket Sub-Projects matching
+		sub_conditions = []
+		sub_params = []
+
+		if clean_batch:
+			sub_conditions.append("t.import_batch = %s")
+			sub_params.append(clean_batch)
+		if clean_bank:
+			sub_conditions.append("(TRIM(t.bank_name) = %s OR TRIM(t.bank_name) LIKE %s)")
+			sub_params.extend([clean_bank, f"%{clean_bank}%"])
+
+		proj_or_list = []
+		for tk in tokens:
+			proj_or_list.append("(LOWER(TRIM(b.project_name)) = %s OR LOWER(TRIM(b.project_name)) LIKE %s)")
+			sub_params.extend([tk.lower(), f"%{tk.lower()}%"])
+
+		cond_sql = " AND ".join(sub_conditions)
+		if cond_sql:
+			cond_sql = " AND " + cond_sql
+
+		proj_sql = " OR ".join(proj_or_list)
+
 		sql_query = f"""
 			SELECT t.name, t.transaction_id, t.transfer_number, t.donor_name, b.sub_amount as total_amount, t.transaction_date, t.reconciliation_status
 			FROM `tabBir Transaction` t
 			INNER JOIN `tabBir Basket Project` b ON b.parent = t.name
 			WHERE t.is_basket = 1
-			{" AND t.import_batch = %s" if import_batch else ""}
-			{" AND t.bank_name = %s" if bank else ""}
-			AND LOWER(TRIM(b.project_name)) IN ({placeholders})
+			{cond_sql}
+			AND ({proj_sql})
 		"""
-		params = [v for v in [import_batch, bank] if v] + tokens
-		txs_basket_rows = frappe.db.sql(sql_query, tuple(params), as_dict=True) or []
+		txs_basket_rows = frappe.db.sql(sql_query, tuple(sub_params), as_dict=True) or []
 
 		items = txs_single + txs_basket_rows
-		total_sub = sum(float(i.total_amount or 0.0) for i in items)
+
+		# Avoid duplicate entries if any
+		seen_keys = set()
+		unique_items = []
+		for i in items:
+			key = f"{i.name}_{i.transaction_id}_{i.total_amount}"
+			if key not in seen_keys:
+				seen_keys.add(key)
+				unique_items.append(i)
+
+		total_sub = sum(float(i.total_amount or 0.0) for i in unique_items)
 
 		donations = []
-		for tx in items:
+		for tx in unique_items:
 			is_reconciled = 1 if tx.reconciliation_status in ["مطابق آليًا", "مطابق يدويًا"] else 0
 			donations.append({
 				"name": tx.name,
